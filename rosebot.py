@@ -1,66 +1,71 @@
 #!/usr/bin/python
 """
-  This class is a partial port from the https://github.com/sparkfun/RedBot
+  This class is a partial port from the https://github.com/sparkfun/RoseBot
   Arduino library into Pymata-aio, with added features for use with the RoseBot
-  
+
 """
 from pymata_aio.constants import Constants
-from rosebot_development.robot.rosebot_pid import PID
 import math
 
-# Constants( that may or may not be included )
+# Default sleep amount
+DEFAULT_SLEEP_S = 0.025
 
-PI = 3.14
+# Constants( that may or may not be included )
 CLOCKWISE = 0
 COUNTER_CLOCKWISE = 1
 DEFAULT_MOTOR_SPEED = 150
 
 # RoseBot Wheel diameter calculations
 COUNT_PER_REV = 192  # 4 pairs of N-S x 48:1 gearbox = 192 ticks per wheel rev
-WHEEL_DIAM = 2.56  # diam = 65mm / 25.4 mm/in WHEEL_CIRC = math.pi * WHEEL_DIAM
-WHEEL_SPREAD = 3  # approx X inches from centre of the RedBot (pivot point) to the wheels. Used to calculate turning angles
-WHEEL_CIRC = PI * WHEEL_DIAM
-WHEEL_CIRC__DIV_COUNT_PER_REV = PI * WHEEL_DIAM * COUNT_PER_REV
+WHEEL_DIAM_IN = 2.56  # diam = 65mm / 25.4 mm/in WHEEL_CIRC_IN = math.pi * WHEEL_DIAM
+WHEEL_TRACK_WIDTH = 3  # approx X inches from centre of the RoseBot (pivot point) to the wheels. Used to calculate turning angles
+WHEEL_CIRC_IN = math.pi * WHEEL_DIAM_IN
 
-
-
-# RedBot motor pins from RedBot.h
-L_CTRL_1 = 2
-L_CTRL_2 = 4
-PWM_L = 5
-
-R_CTRL_1 = 7
-R_CTRL_2 = 8
-PWM_R = 6
-
-ENCODER_PIN_LEFT = 16
-ENCODER_PIN_RIGHT = 10
+# Motor control pins
+PIN_LEFT_MOTOR_CONTROL_1 = 2
+PIN_LEFT_MOTOR_CONTROL_2 = 4
+PIN_LEFT_MOTOR_PWM = 5
+PIN_RIGHT_MOTOR_CONTROL_1 = 7
+PIN_RIGHT_MOTOR_CONTROL_2 = 8
+PIN_RIGHT_MOTOR_PWM = 6
 
 DIRECTION_FORWARD = 1
 DIRECTION_REVERSE = -1
 
-PIN_LEFT_LINE_FOLLOWER = 3
-PIN_CENTER_LINE_FOLLOWER = 6
-PIN_RIGHT_LINE_FOLLOWER = 7
+# Sensor pins
 PIN_A0 = 0
+PIN_A0_AS_DIGITAL = 14 # Also used for SoftwareSerial Tx
 PIN_A1 = 1
-PIN_A2 = 16
-PIN_A3 = 17
+PIN_A1_AS_DIGITAL = 15 # Also used for SoftwareSerial Rx
+PIN_A2 = 2
+PIN_A2_AS_DIGITAL = 16 # Commonly used for the left encoder
+PIN_A3 = 3 # Commonly used for left line or distance sensor
+PIN_A3_AS_DIGITAL = 17
 PIN_A4 = 4
+PIN_A4_AS_DIGITAL = 18 # Also used for I2C
 PIN_A5 = 5
-PIN_A6 = 6
-PIN_A7 = 7
-PIN_3 = 3
-PIN_9 = 9
-PIN_10 = 10
-PIN_11 = 11
+PIN_A5_AS_DIGITAL = 19 # Also used for I2C
+PIN_A6 = 6 # Commonly used for center line or distance sensor
+PIN_A6_AS_DIGITAL = 20
+PIN_A7 = 7 # Commonly used for right line or distance sensor
+PIN_A7_AS_DIGITAL = 21
+PIN_3 = 3 # Common used for the left bumper
+PIN_9 = 9 # Common location for the buzzer
+PIN_10 = 10 # Commonly used for the right encoder
+PIN_11 = 11 # Commonly used for the right bumper
 PIN_BUTTON = 12
 PIN_LED = 13
 
-encoder_object = None
-pid_controller = PID(1, 0, 0)  # TODO: Ask if this variable should/could be accessed from within example scripts?
+# Encoders
+PIN_LEFT_ENCODER = PIN_A2_AS_DIGITAL
+PIN_RIGHT_ENCODER = PIN_10
 
-class RedBotEncoder:
+
+encoder_object = None
+
+class RoseBotEncoder:
+    """Track the encoder ticks.  This class should only be instantiated once and a global reference used to
+       communicate with the RoseMotor class."""
     def __init__(self, board):
         global encoder_object
         encoder_object = self  # Save a global reference to the one and only encoder_object so that the motors can set the direction.
@@ -69,10 +74,11 @@ class RedBotEncoder:
         self.right_encoder_count = 0
         self.left_direction = DIRECTION_FORWARD  # default to forward if not set
         self.right_direction = DIRECTION_FORWARD  # default to forward if not set
-        board.encoder_config(ENCODER_PIN_LEFT, ENCODER_PIN_RIGHT, self.encoder_callback,
+        board.encoder_config(PIN_LEFT_ENCODER, PIN_RIGHT_ENCODER, self._encoder_callback,
                              Constants.CB_TYPE_DIRECT, True)
 
-    def encoder_callback(self, data):
+    def _encoder_callback(self, data):
+        """Internal callback when encoder data updates."""
         if self.left_direction == DIRECTION_FORWARD:
             self.left_encoder_count += data[0]
         else:
@@ -82,276 +88,183 @@ class RedBotEncoder:
         else:
             self.right_encoder_count -= data[1]
 
-    def clear_enc(self, flag=None):
-        if flag == None:
+    def clear_enc(self, encoder_pin_to_reset=None):
+        """Clears the encoder count accumulators.
+           Optionally you can pass in the encoder pin value to reset only 1 of the two encoder counters."""
+        if encoder_pin_to_reset == None:
             self.left_encoder_count = 0
             self.right_encoder_count = 0
-        elif flag == ENCODER_PIN_RIGHT:
+        elif encoder_pin_to_reset == PIN_RIGHT_ENCODER:
             self.right_encoder_count = 0
-        elif flag == ENCODER_PIN_LEFT:
+        elif encoder_pin_to_reset == PIN_LEFT_ENCODER:
             self.left_encoder_count = 0
 
-    def get_ticks(self, encoder):
-        if encoder == ENCODER_PIN_LEFT:
+    def get_ticks(self, encoder_pin):
+        """Pass in the encoder pin value to get the number of ticks for that encoder."""
+        if encoder_pin == PIN_LEFT_ENCODER:
             return self.left_encoder_count
-        elif encoder == ENCODER_PIN_RIGHT:
+        elif encoder_pin == PIN_RIGHT_ENCODER:
             return self.right_encoder_count
 
-    def drive_distance(self, distance, motor_power):
-        left_count = 0
-        right_count = 0
-        num_rev = distance / WHEEL_CIRC
 
-        print("drive_distance() {} inches at {} power for {:.2f} revolutions".format(distance, motor_power, num_rev))
-
-        self.encoders.clear_enc()  # clear the encoder count
-        self.motors.drive(motor_power)
-
-        while right_count < self.num_rev * COUNT_PER_REV:
-            left_count = self.encoders.get_ticks(ENCODER_PIN_LEFT)
-            right_count = self.encoders.get_ticks(ENCODER_PIN_RIGHT)
-            print("{}       {}       stop once over {:.0f} ticks".format(left_count, right_count,
-                                                                         num_rev * COUNT_PER_REV))
-            self.board.sleep(0.1)
-
-        self.motors.brake()
-
-    def get_turn_angle(self):
-
-        total_revolutions = self.left_encoder_count / COUNT_PER_REV
-        angle_in_radians = (WHEEL_DIAM * PI) * total_revolutions / WHEEL_SPREAD  # this is calculating the arc angle
-        angle_in_degrees = angle_in_radians * 360 / (2 * PI)
-
-        return angle_in_degrees
-
-    def turn_angle(self, angle_wanted, direction, motor_speed=DEFAULT_MOTOR_SPEED):
-        self.clear_enc()
-        angle_wanted_in_ticks = WHEEL_CIRC * self.get_ticks(self.left_encoder_count) / COUNT_PER_REV
-        angle_turned_in_ticks = 0
-
-
-        while angle_turned_in_ticks < angle_wanted_in_ticks:
-
-            if direction == CLOCKWISE:
-                self.motors.drive(motor_speed)
-
-            elif direction == COUNTER_CLOCKWISE:
-                self.motors.drive(-motor_speed)  # TODO: Fix this to drive at current turning speed
-                total_revolutions = self.left_encoder_count / COUNT_PER_REV
-                angle_in_radians = (WHEEL_CIRC) * total_revolutions / WHEEL_SPREAD  # this is calculating the arc angle
-                angle_in_degrees = angle_in_radians * 360 / (2 * PI)
-
-
-
-
-
-
-
-class RedBotMotors:
-    """Controls the motors on the RedBot"""
+class RoseBotMotors:
+    """Controls the motors on the RoseBot."""
 
     def __init__(self, board):
         """Constructor for pin setup"""
-
         self.board = board
-        self.total_left_ticks = 0
-        self.total_right_ticks = 0
-        # The interface to the motor driver is kind of ugly. It's three pins per
-        # channel: two that define role (forward, reverse, stop, brake) and one
-        # PWM input for speed.
-        board.set_pin_mode(L_CTRL_1, Constants.OUTPUT)
-        board.set_pin_mode(L_CTRL_2, Constants.OUTPUT)
-        board.set_pin_mode(PWM_L, Constants.PWM)  # Not done in RedBot motors but I just went ahead and added it.
-        board.set_pin_mode(R_CTRL_1, Constants.OUTPUT)
-        board.set_pin_mode(R_CTRL_2, Constants.OUTPUT)
-        board.set_pin_mode(PWM_R, Constants.PWM)  # Not done in RedBot motors but I just went ahead and added it.
+        board.set_pin_mode(PIN_LEFT_MOTOR_CONTROL_1, Constants.OUTPUT)
+        board.set_pin_mode(PIN_LEFT_MOTOR_CONTROL_2, Constants.OUTPUT)
+        board.set_pin_mode(PIN_LEFT_MOTOR_PWM, Constants.PWM)  # Choosing to set explicitly, not required
+        board.set_pin_mode(PIN_RIGHT_MOTOR_CONTROL_1, Constants.OUTPUT)
+        board.set_pin_mode(PIN_RIGHT_MOTOR_CONTROL_2, Constants.OUTPUT)
+        board.set_pin_mode(PIN_RIGHT_MOTOR_PWM, Constants.PWM)  # Choosing to set explicitly, not required
 
     def brake(self):
-        """effectively shorts the two leads of the motor together, which causes the motor to resist being turned. It stops quite quickly."""
+        """Effectively shorts the two leads of the motor together, which causes the motor to resist being turned.
+           Causes the robot to stop quicker."""
         self.left_brake()
         self.right_brake()
 
-    def drive(self, left_speed, right_speed=None, durationS=-1.0):
-        """
-            Starts both motors. It figures out whether the motors should go
-            forward or reverse, then calls the appropriate individual functions. Note
-            the use of a 16-bit integer for the speed input an 8-bit integer doesn't
-            have the range to reach full speed. The calls to the actual drive functions
-            are only 8-bit, since we only have 8-bit PWM.
-        """
-
-        if right_speed is None:  # If no right_speed is entered, then the right motor speed mirrors the left motor
-            right_speed = left_speed
-
-        if left_speed > 0:
-            self.left_fwd(min(abs(left_speed), 255))
-        else:
-            self.left_rev(min(abs(left_speed), 255))
-        if right_speed > 0:
-            self.right_fwd(min(abs(right_speed), 255))
-        else:
-            self.right_rev(min(abs(right_speed), 255))
-
-        if durationS > 0:
-            self.board.sleep(durationS)
-            self.left_stop()
-            self.right_stop()
-
-    def drive_speed(self, desired_speed, encoder_left, encoder_right, use_encoder_feedback=False):
-
-
-        if encoder_object:
-        # TODO: finsh/rework converting encoder ticks to speeds
-
-            current_left_speed = encoder_left.get_ticks() * WHEEL_CIRC__DIV_COUNT_PER_REV  # all constants lumped together into one -> pi*wheel_diam/ticks_per_revolution
-            current_right_speed = encoder_right.get_ticks() * WHEEL_CIRC__DIV_COUNT_PER_REV
-            left_motor_power = pid_controller.update(desired_speed - current_left_speed)
-            right_motor_power = pid_controller.update(desired_speed - current_right_speed)
-            self.left_fwd(left_motor_power)
-            self.drive(left_motor_power, right_motor_power)
-
-        else:
-            # guess speeds #TODO: MAP PWMS TO SPEEDS
-            pass
-
-
-    def left_motor(self, speed, durationS=-1.0):
-        """Basically the same as drive(), but omitting the right motor."""
-        if speed > 0:
-            self.left_rev(min(abs(speed), 255))
-        else:
-            self.left_fwd(min(abs(speed), 255))
-        if durationS > 0:
-            self.board.sleep(durationS)
-            self.left_stop()
-
-    def right_motor(self, speed, durationS=-1.0):
-        """Basically the same as drive(), but omitting the left motor."""
-        if speed > 0:
-            self.right_fwd(min(abs(speed), 255))
-        else:
-            self.right_rev(min(abs(speed), 255))
-        if durationS > 0:
-            self.board.sleep(durationS)
-            self.left_stop()
-
-    def stop(self):
-        """
-            stop() allows the motors to coast to a stop, rather than trying to stop them
-            quickly. As will be the case with functions affecting both motors, the
-            global stop just calls the individual stop functions for each wheel.
-        """
-        self.left_stop()
-        self.right_stop()
-
     def left_brake(self):
-        """brakes left motor, stopping it immediately"""
-        self.board.digital_write(L_CTRL_1, 1)
-        self.board.digital_write(L_CTRL_2, 1)
-        self.board.analog_write(PWM_L, 0)
+        """Brakes left motor, stopping it immediately"""
+        self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(PIN_LEFT_MOTOR_PWM, 0)
 
     def right_brake(self):
-        """brakes right motor, stopping it immediately"""
-        self.board.digital_write(R_CTRL_1, 1)
-        self.board.digital_write(R_CTRL_2, 1)
-        self.board.analog_write(PWM_R, 0)
+        """Brakes right motor, stopping it immediately"""
+        self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(PIN_RIGHT_MOTOR_PWM, 0)
 
-    def left_stop(self):
-        """allows left motor to coast to a stop"""
-        self.board.digital_write(L_CTRL_1, 0)
-        self.board.digital_write(L_CTRL_2, 0)
-        self.board.analog_write(PWM_L, 0)
-
-    def right_stop(self):
-        """allows left motor to coast to a stop"""
-        self.board.digital_write(R_CTRL_1, 0)
-        self.board.digital_write(R_CTRL_2, 0)
-        self.board.analog_write(PWM_R, 0)
-
-    def pivot(self, speed, durationS=-1.0):
+    def drive(self, left_pwm, right_pwm=None):
+        """Drive the left and right motors using pwm values.
+           Positive values go forwards (capped at 255).  Negative values go in reverse (capped at -255).
         """
-            pivot() controls the pivot speed of the RedBot. The values of the pivot function inputs
-            range from -255:255, with -255 indicating a full speed counter-clockwise rotation.
-            255 indicates a full speed clockwise rotation
-        """
-        if speed < 0:
-            self.left_fwd(min(abs(speed), 255))
-            self.right_rev(min(abs(speed), 255))
+        if right_pwm is None:  # If no right_pwm is entered, then the right motor speed mirrors the left motor
+            right_pwm = left_pwm
+        self.drive_left(left_pwm)
+        self.drive_right(right_pwm)
+
+
+    def drive_left(self, pwm):
+        """Drive the left motor based on the pwm value.
+           Positive values go forwards (capped at 255).  Negative values go in reverse (capped at -255)."""
+        if pwm > 0:
+            self._left_fwd(min(abs(pwm), 255))
         else:
-            self.left_rev(min(abs(speed), 255))
-            self.right_fwd(min(abs(speed), 255))
-        if durationS > 0:
-            self.board.sleep(durationS)
-            self.left_stop()
-            self.right_stop()
+            self._left_rev(min(abs(pwm), 255))
 
+    def drive_right(self, pwm):
+        """Drive the right motor based on the pwm value.
+           Positive values go forwards (capped at 255).  Negative values go in reverse (capped at -255)."""
+        if pwm > 0:
+            self._right_fwd(min(abs(pwm), 255))
+        else:
+            self._right_rev(min(abs(pwm), 255))
+
+    def drive_distance(self, distance_in, left_pwm, right_pwm=None):
+        """Drives a certain distance in inches then stops with independent motor pwm values."""
+        if right_pwm is None:  # If no right_speed is entered, then the right motor speed mirrors the left motor
+            right_pwm = left_pwm
+        left_count = 0
+        right_count = 0
+        num_ticks = distance_in / WHEEL_CIRC_IN * COUNT_PER_REV
+        encoder_object.clear_enc()  # clear the encoder count
+        self.drive_left(left_pwm)
+        self.drive_right(right_pwm)
+        while right_count < num_ticks  or left_count < num_ticks:
+            left_count = self.encoders.get_ticks(PIN_LEFT_ENCODER)
+            right_count = self.encoders.get_ticks(PIN_RIGHT_ENCODER)
+            self.board.sleep(DEFAULT_SLEEP_S)
+        self.brake()
+
+    def turn_angle(self, angle_degrees, motor_pwm=DEFAULT_MOTOR_SPEED):
+        """Turns a certain number of degrees (negative is a left turn counterclockwise, positive is a right turn clockwise)"""
+        self.clear_enc()
+        angle_radians = math.radians(angle_degrees)
+        arc_length = WHEEL_TRACK_WIDTH / 2.0 * angle_radians
+        angle_wanted_in_ticks = arc_length / WHEEL_CIRC_IN * COUNT_PER_REV
+        if angle_degrees < 0:
+            self.motors.drive_left(motor_pwm)
+            self.motors.drive_right(-motor_pwm)
+        else:
+            self.motors.drive_left(motor_pwm)
+            self.motors.drive_right(-motor_pwm)
+        while self.left_encoder_count < angle_wanted_in_ticks:
+            self.board.sleep(DEFAULT_SLEEP_S)
+        self.brake()
+        # TODO: Test this method.  After testing delete this comment.
 
     # ******************************************************************************
-    #  Private functions for RedBotMotor
+    #  Private functions for RoseBotMotor
     # ******************************************************************************/
-    # These are the motor-driver level abstractions for turning a given motor the
-    #  right direction. Users never see them, and *should* never see them, so we
-    #  make them private.
-
-    def left_fwd(self, spd):
-        self.board.digital_write(L_CTRL_1, 1)
-        self.board.digital_write(L_CTRL_2, 0)
-        self.board.analog_write(PWM_L, spd)
+    def _left_fwd(self, pwm):
+        self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_2, 0)
+        self.board.analog_write(PIN_LEFT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if encoder_object:
             encoder_object.left_direction = DIRECTION_FORWARD
 
-    def left_rev(self, spd):
-        self.board.digital_write(L_CTRL_1, 0)
-        self.board.digital_write(L_CTRL_2, 1)
-        self.board.analog_write(PWM_L, spd)
+    def _left_rev(self, pwm):
+        self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_1, 0)
+        self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(PIN_LEFT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if encoder_object:
             encoder_object.left_direction = DIRECTION_REVERSE
 
-    def right_fwd(self, spd):
-        self.board.digital_write(R_CTRL_1, 1)
-        self.board.digital_write(R_CTRL_2, 0)
-        self.board.analog_write(PWM_R, spd)
+    def _right_fwd(self, pwm):
+        self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_2, 0)
+        self.board.analog_write(PIN_RIGHT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if encoder_object:
             encoder_object.right_direction = DIRECTION_FORWARD
 
-    def right_rev(self, spd):
-        self.board.digital_write(R_CTRL_1, 0)
-        self.board.digital_write(R_CTRL_2, 1)
-        self.board.analog_write(PWM_R, spd)
+    def _right_rev(self, pwm):
+        self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_1, 0)
+        self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(PIN_RIGHT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if encoder_object:
-            print("Right is in reverse")
             encoder_object.right_direction = DIRECTION_REVERSE
 
 
-class RedBotSensor:
+class RoseBotSensor:
+    """Gets readings from the RoseBot sensors."""
     pin_number = 0
 
     def __init__(self, board, pin_number):
         self.board = board
         self.pin_number = pin_number
+
+class RoseBotAnalogSensor(RoseBotSensor):
+    """Gets analog readings from the RoseBot sensors."""
+
+    def __init__(self, board, pin_number):
+        super().__init__(board, pin_number)
         board.set_pin_mode(pin_number, Constants.ANALOG)
 
     def read(self):
         return self.board.analog_read(self.pin_number)
 
 
-class RedBotBumper:
-    pin_number = 0
-
+class RoseBotDigitalSensor(RoseBotSensor):
+    """Gets digital readings from the RoseBot sensors."""
     def __init__(self, board, pin_number):
-        self.pin_number = pin_number
-        self.board = board
+        super().__init__(board, pin_number)
         self.board.set_pin_mode(pin_number, Constants.INPUT)
+        # TODO: Change the 1 to Constants.HIGH once that constant is added.
         self.board.digital_write(pin_number, 1)  # sets pin pull-up resistor. INPUT_PULLUP is not an option with Pymata
         pass
 
     def read(self):
         return self.board.digital_read(self.pin_number)
+
