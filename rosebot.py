@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-  This class is a partial port from the https://github.com/sparkfun/RoseBot
+  This class is a partial port from the https://github.com/sparkfun/RedBot
   Arduino library into Pymata-aio, with added features for use with the RoseBot
 
 """
@@ -16,9 +16,9 @@ COUNTER_CLOCKWISE = 1
 DEFAULT_MOTOR_SPEED = 150
 
 # RoseBot Wheel diameter calculations
-COUNT_PER_REV = 192  # 4 pairs of N-S x 48:1 gearbox = 192 ticks per wheel rev
+COUNTS_PER_REV = 192  # 4 pairs of N-S x 48:1 gearbox = 192 ticks per wheel rev
 WHEEL_DIAM_IN = 2.56  # diam = 65mm / 25.4 mm/in WHEEL_CIRC_IN = math.pi * WHEEL_DIAM
-WHEEL_TRACK_WIDTH = 3  # approx X inches from centre of the RoseBot (pivot point) to the wheels. Used to calculate turning angles
+WHEEL_TRACK_WIDTH = 6  # approx X inches from centre of the RoseBot (pivot point) to the wheels. Used to calculate turning angles
 WHEEL_CIRC_IN = math.pi * WHEEL_DIAM_IN
 
 # Motor control pins
@@ -62,6 +62,8 @@ PIN_RIGHT_ENCODER = PIN_10
 
 
 encoder_object = None
+distance_travelled = 0;
+current_angle = 0;
 
 class RoseBotEncoder:
     """Track the encoder ticks.  This class should only be instantiated once and a global reference used to
@@ -105,8 +107,14 @@ class RoseBotEncoder:
             return self.left_encoder_count
         elif encoder_pin == PIN_RIGHT_ENCODER:
             return self.right_encoder_count
-
-
+        
+    def get_distance():
+        """Uses the current encoder ticks and returns a value for the distance tavelled in inches. Uses the minimum count of the encoders to ensure that the RoseBot is not just going around in a circle"""
+        avg_encoder_count = (self.left_encoder_count+self.right_encoder_count)/2
+        distance_travelled= WHEEL_CIRC_IN*avg_encoder_count/COUNTS_PER_REV
+        return  distance_travelled
+        
+    
 class RoseBotMotors:
     """Controls the motors on the RoseBot."""
 
@@ -170,7 +178,7 @@ class RoseBotMotors:
             right_pwm = left_pwm
         left_count = 0
         right_count = 0
-        num_ticks = distance_in / WHEEL_CIRC_IN * COUNT_PER_REV
+        num_ticks = distance_in / WHEEL_CIRC_IN * COUNTS_PER_REV
         encoder_object.clear_enc()  # clear the encoder count
         self.drive_left(left_pwm)
         self.drive_right(right_pwm)
@@ -185,7 +193,7 @@ class RoseBotMotors:
         self.clear_enc()
         angle_radians = math.radians(angle_degrees)
         arc_length = WHEEL_TRACK_WIDTH / 2.0 * angle_radians
-        angle_wanted_in_ticks = arc_length / WHEEL_CIRC_IN * COUNT_PER_REV
+        angle_wanted_in_ticks = arc_length / WHEEL_CIRC_IN * COUNTS_PER_REV
         if angle_degrees < 0:
             self.motors.drive_left(motor_pwm)
             self.motors.drive_right(-motor_pwm)
@@ -268,3 +276,89 @@ class RoseBotDigitalSensor(RoseBotSensor):
     def read(self):
         return self.board.digital_read(self.pin_number)
 
+class RoseBotServo:
+    def __init__(self, board, pin_number):
+        self.board = board
+        self.pin_number = pin_number
+        self.board.servo_config(pin_number)
+        
+
+    def write(self, servo_position):
+        self.board.analog_write(self.pin_number, servo_position)
+
+
+    
+    
+class RoseBot_PID:
+
+    def __init__(self, P=1.0, I=0.0, D=0.0, derivator=0, integrator=0, integrator_max=100, integrator_min=-100):
+
+        self.Kp = P
+        self.Ki = I
+        self.Kd = D
+        self.derivator = derivator
+        self.integrator = integrator
+        self.integrator_max = integrator_max
+        self.integrator_min = integrator_min
+
+        self.set_point = 0.0
+        self.error = 0.0
+
+    def update(self, current_value):
+        """
+        Calculate PID output value for given reference input and feedback
+        """
+
+        self.error = self.set_point - current_value
+
+        self.p_value = self.Kp * self.error
+        self.d_value = self.Kd * (self.error - self.derivator)
+        self.derivator = self.error
+
+        self.integrator = self.integrator + self.error
+
+        if self.integrator > self.integrator_max:
+            self.integrator = self.integrator_max
+        elif self.integrator < self.integrator_min:
+            self.integrator = self.integrator_min
+
+        self.i_value = self.integrator * self.Ki
+
+        PID = self.p_value + self.i_value + self.d_value
+
+        return PID
+
+    def set_point(self, set_point):
+        """
+        Initilize the setpoint of PID. Sets the value that the PID control aims to stabilize around
+        """
+        self.set_point = set_point
+        self.integrator = 0
+        self.derivator = 0
+
+    def set_integrator(self, integrator):
+        self.integrator = integrator
+
+    def set_derivator(self, derivator):
+        self.derivator = derivator
+
+    def set_Kp(self, P):
+        self.Kp = P
+
+    def set_Ki(self, I):
+        self.Ki = I
+
+    def set_Kd(self, D):
+        self.Kd = D
+
+    def get_point(self):
+        return self.set_point
+
+    def get_error(self):
+        return self.error
+
+    def get_integrator(self):
+        return self.integrator
+
+    def get_derivator(self):
+        return self.derivator
