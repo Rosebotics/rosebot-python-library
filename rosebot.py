@@ -1,11 +1,15 @@
 #!/usr/bin/python
 """
-  This class is a partial port from the https://github.com/sparkfun/RoseBot
-  Arduino library into Pymata-aio, with added features for use with the RoseBot
+  This class is a wrapper for the Pymata3 library that is specifically designed
+  for the RoseBot.
 
 """
-from pymata_aio.constants import Constants
+
 import math
+
+from pymata_aio.constants import Constants
+from pymata_aio.pymata3 import PyMata3
+
 
 # Default sleep amount
 DEFAULT_SLEEP_S = 0.025
@@ -60,6 +64,20 @@ PIN_LED = 13
 PIN_LEFT_ENCODER = PIN_A2_AS_DIGITAL
 PIN_RIGHT_ENCODER = PIN_10
 
+
+class RoseBotConnection(PyMata3):
+    """Creates the Pymata connection to the Arduino board with default parameters and returns the Pymata3 object."""
+    def __init__(self, ip_address=None, com_port=None):
+        if ip_address != None:
+            print("Connecting to ip address " + ip_address + "...")
+        elif com_port != None:
+            print("Connecting via com port " + com_port + "...")
+        else:
+            print("Connecting via com port using automatic com port detection...")
+        super().__init__(arduino_wait=0, log_output=True, com_port=com_port, ip_address=ip_address)
+        # TODO: Add this once pymata-aio 2.6 ships
+        #self.keep_alive(2.0)
+        print("Ready!")
 
 encoder_object = None
 
@@ -237,7 +255,7 @@ class RoseBotMotors:
             encoder_object.right_direction = DIRECTION_REVERSE
 
 
-class RoseBotSensor:
+class RoseBotInput:
     """Gets readings from the RoseBot sensors."""
     pin_number = 0
 
@@ -245,7 +263,7 @@ class RoseBotSensor:
         self.board = board
         self.pin_number = pin_number
 
-class RoseBotAnalogSensor(RoseBotSensor):
+class RoseBotAnalogInput(RoseBotInput):
     """Gets analog readings from the RoseBot sensors."""
 
     def __init__(self, board, pin_number):
@@ -256,7 +274,7 @@ class RoseBotAnalogSensor(RoseBotSensor):
         return self.board.analog_read(self.pin_number)
 
 
-class RoseBotDigitalSensor(RoseBotSensor):
+class RoseBotDigitalInput(RoseBotInput):
     """Gets digital readings from the RoseBot sensors."""
     def __init__(self, board, pin_number):
         super().__init__(board, pin_number)
