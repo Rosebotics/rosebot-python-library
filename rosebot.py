@@ -78,9 +78,9 @@ class RoseBotConnection(PyMata3):
         #self.keep_alive(2.0)
         print("Ready!")
 
+
+# The one and only encoder object that is shared between classes.
 encoder_object = None
-distance_travelled = 0;
-current_angle = 0;
 
 class RoseBotEncoder:
     """Track the encoder ticks.  This class should only be instantiated once and a global reference used to
@@ -125,11 +125,10 @@ class RoseBotEncoder:
         elif encoder_pin == PIN_RIGHT_ENCODER:
             return self.right_encoder_count
         
-    def get_distance():
-        """Uses the current encoder ticks and returns a value for the distance tavelled in inches. Uses the minimum count of the encoders to ensure that the RoseBot is not just going around in a circle"""
-        avg_encoder_count = (self.left_encoder_count+self.right_encoder_count)/2
-        distance_travelled= WHEEL_CIRC_IN*avg_encoder_count/COUNTS_PER_REV
-        return  distance_travelled
+    def get_distance(self):
+        """Uses the current encoder ticks and returns a value for the distance traveled in inches. Uses the minimum count of the encoders to ensure that the RoseBot is not just going around in a circle"""
+        avg_encoder_count = (self.left_encoder_count + self.right_encoder_count) / 2
+        return  WHEEL_CIRC_IN * avg_encoder_count / COUNTS_PER_REV
         
     
 class RoseBotMotors:
@@ -294,88 +293,13 @@ class RoseBotDigitalInput(RoseBotInput):
         return self.board.digital_read(self.pin_number)
 
 class RoseBotServo:
+   """Control servo motors connected to the RoseBot """
+    
     def __init__(self, board, pin_number):
         self.board = board
         self.pin_number = pin_number
         self.board.servo_config(pin_number)
-        
 
     def write(self, servo_position):
         self.board.analog_write(self.pin_number, servo_position)
 
-
-    
-    
-class RoseBot_PID:
-
-    def __init__(self, P=1.0, I=0.0, D=0.0, derivator=0, integrator=0, integrator_max=100, integrator_min=-100):
-
-        self.Kp = P
-        self.Ki = I
-        self.Kd = D
-        self.derivator = derivator
-        self.integrator = integrator
-        self.integrator_max = integrator_max
-        self.integrator_min = integrator_min
-
-        self.set_point = 0.0
-        self.error = 0.0
-
-    def update(self, current_value):
-        """
-        Calculate PID output value for given reference input and feedback
-        """
-
-        self.error = self.set_point - current_value
-
-        self.p_value = self.Kp * self.error
-        self.d_value = self.Kd * (self.error - self.derivator)
-        self.derivator = self.error
-
-        self.integrator = self.integrator + self.error
-
-        if self.integrator > self.integrator_max:
-            self.integrator = self.integrator_max
-        elif self.integrator < self.integrator_min:
-            self.integrator = self.integrator_min
-
-        self.i_value = self.integrator * self.Ki
-
-        PID = self.p_value + self.i_value + self.d_value
-
-        return PID
-
-    def set_point(self, set_point):
-        """
-        Initilize the setpoint of PID. Sets the value that the PID control aims to stabilize around
-        """
-        self.set_point = set_point
-        self.integrator = 0
-        self.derivator = 0
-
-    def set_integrator(self, integrator):
-        self.integrator = integrator
-
-    def set_derivator(self, derivator):
-        self.derivator = derivator
-
-    def set_Kp(self, P):
-        self.Kp = P
-
-    def set_Ki(self, I):
-        self.Ki = I
-
-    def set_Kd(self, D):
-        self.Kd = D
-
-    def get_point(self):
-        return self.set_point
-
-    def get_error(self):
-        return self.error
-
-    def get_integrator(self):
-        return self.integrator
-
-    def get_derivator(self):
-        return self.derivator
