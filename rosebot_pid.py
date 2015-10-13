@@ -1,11 +1,11 @@
-"""# This library gives a simple implementation of a PID controller for the RedBot.
+"""# This library gives a simple implementation of a PID controller for the RoseBot.
 # PID controllers output a value for error between desired reference input and measurement feedback to
 # minimize error value.
 #
 # Credit and thanks to cnr437@gmail.com for the majority of this code """
 
 
-class PID:
+class RoseBot_PID:
 
 
     def __init__(self, P=1.0, I=0.0, D=0.0, derivator=0, integrator=0, integrator_max=100, integrator_min=-100):
