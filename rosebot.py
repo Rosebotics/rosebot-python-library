@@ -221,10 +221,12 @@ class RoseBotMotors:
         self.brake()
         # TODO: Test this method.  After testing delete this comment.
 
+
     # ******************************************************************************
     #  Private functions for RoseBotMotor
     # ******************************************************************************/
     def _left_fwd(self, pwm):
+        """Sets the H-Bridge control lines to forward and sets the PWM value."""
         self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_1, 1)
         self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_2, 0)
         self.board.analog_write(PIN_LEFT_MOTOR_PWM, pwm)
@@ -234,6 +236,7 @@ class RoseBotMotors:
             encoder_object.left_direction = DIRECTION_FORWARD
 
     def _left_rev(self, pwm):
+        """Sets the H-Bridge control lines to reverse and sets the PWM value."""
         self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_1, 0)
         self.board.digital_write(PIN_LEFT_MOTOR_CONTROL_2, 1)
         self.board.analog_write(PIN_LEFT_MOTOR_PWM, pwm)
@@ -243,6 +246,7 @@ class RoseBotMotors:
             encoder_object.left_direction = DIRECTION_REVERSE
 
     def _right_fwd(self, pwm):
+        """Sets the H-Bridge control lines to forward and sets the PWM value."""
         self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_1, 1)
         self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_2, 0)
         self.board.analog_write(PIN_RIGHT_MOTOR_PWM, pwm)
@@ -252,6 +256,7 @@ class RoseBotMotors:
             encoder_object.right_direction = DIRECTION_FORWARD
 
     def _right_rev(self, pwm):
+        """Sets the H-Bridge control lines to reverse and sets the PWM value."""
         self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_1, 0)
         self.board.digital_write(PIN_RIGHT_MOTOR_CONTROL_2, 1)
         self.board.analog_write(PIN_RIGHT_MOTOR_PWM, pwm)
@@ -263,11 +268,11 @@ class RoseBotMotors:
 
 class RoseBotInput:
     """Gets readings from the RoseBot sensors."""
-    pin_number = 0
 
     def __init__(self, board, pin_number):
         self.board = board
         self.pin_number = pin_number
+
 
 class RoseBotAnalogInput(RoseBotInput):
     """Gets analog readings from the RoseBot sensors."""
@@ -282,6 +287,7 @@ class RoseBotAnalogInput(RoseBotInput):
 
 class RoseBotDigitalInput(RoseBotInput):
     """Gets digital readings from the RoseBot sensors."""
+    
     def __init__(self, board, pin_number):
         super().__init__(board, pin_number)
         self.board.set_pin_mode(pin_number, Constants.INPUT)
@@ -294,8 +300,7 @@ class RoseBotDigitalInput(RoseBotInput):
 
 
 class RoseBotServo:
-    """Gets readings from the RoseBot sensors."""
-    pin_number = 0
+    """Control servo motors connected to the RoseBot """
 
     def __init__(self, board, pin_number):
         self.board = board
