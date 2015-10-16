@@ -287,19 +287,20 @@ class RoseBotDigitalInput(RoseBotInput):
         self.board.set_pin_mode(pin_number, Constants.INPUT)
         # TODO: Change the 1 to Constants.HIGH once that constant is added.
         self.board.digital_write(pin_number, 1)  # sets pin pull-up resistor. INPUT_PULLUP is not an option with Pymata
-        pass
+       
 
     def read(self):
         return self.board.digital_read(self.pin_number)
 
+
 class RoseBotServo:
-   """Control servo motors connected to the RoseBot """
-    
+    """Gets readings from the RoseBot sensors."""
+    pin_number = 0
+
     def __init__(self, board, pin_number):
         self.board = board
         self.pin_number = pin_number
         self.board.servo_config(pin_number)
-
-    def write(self, servo_position):
+    def write (self, servo_position):
         self.board.analog_write(self.pin_number, servo_position)
 
