@@ -67,15 +67,16 @@ PIN_RIGHT_ENCODER = PIN_10
 class RoseBotConnection(PyMata3):
     """Creates the Pymata connection to the Arduino board with default parameters and returns the Pymata3 object."""
     def __init__(self, ip_address=None, com_port=None):
+        reboot_time=2
         if ip_address != None:
             print("Connecting to ip address " + ip_address + "...")
+            reboot_time=0 # Arduino does not reset if using a WiFly.
         elif com_port != None:
             print("Connecting via com port " + com_port + "...")
         else:
             print("Connecting via com port using automatic com port detection...")
-        super().__init__(arduino_wait=0, log_output=True, com_port=com_port, ip_address=ip_address)
-        # TODO: Add this once pymata-aio 2.6 ships
-        #self.keep_alive(2.0)
+        super().__init__(arduino_wait=reboot_time, log_output=True, com_port=com_port, ip_address=ip_address)
+        self.keep_alive(period=2.222, margin=.1) # send a keep alive every 2 seconds, if not received within 2.222 reset.
         print("Ready!")
 
 
