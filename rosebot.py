@@ -17,6 +17,10 @@ DEFAULT_SLEEP_S = 0.025
 CLOCKWISE = 0
 COUNTER_CLOCKWISE = 1
 DEFAULT_MOTOR_SPEED = 150
+INPUT = 0x00  # pin set as input
+OUTPUT = 0x01  # pin set as output
+LOW = 0x00
+HIGH = 0x01
 
 # RoseBot Wheel diameter calculations
 COUNTS_PER_REV = 192  # 4 pairs of N-S x 48:1 gearbox = 192 ticks per wheel rev
@@ -74,8 +78,7 @@ class RoseBotConnection(PyMata3):
         else:
             print("Connecting via com port using automatic com port detection...")
         super().__init__(arduino_wait=0, log_output=True, com_port=com_port, ip_address=ip_address)
-        # TODO: Add this once pymata-aio 2.6 ships
-        #self.keep_alive(2.0)
+        self.keep_alive(2.0)
         print("Ready!")
 
 
@@ -265,6 +268,17 @@ class RoseBotMotors:
         if encoder_object:
             encoder_object.right_direction = DIRECTION_REVERSE
 
+class RoseBotBuzzer:
+    def __init__(self, board, pin_number):
+        self.board = board
+        self.pin_number = pin_number
+            
+    def play_tone(self, note, duration = None):
+        self.board.play_tone(self.pin_number, Constants.TONE_TONE, note, duration)
+        
+    def stop(self):
+        self.board.play_tone(self.pin_number, Constants.TONE_NO_TONE, 0, 0)
+
 
 class RoseBotInput:
     """Gets readings from the RoseBot sensors."""
@@ -306,6 +320,24 @@ class RoseBotServo:
         self.board = board
         self.pin_number = pin_number
         self.board.servo_config(pin_number)
+        
     def write (self, servo_position):
         self.board.analog_write(self.pin_number, servo_position)
-
+        
+        
+class RoseBotDigitalOutput:
+    """Control digital outputs connected to the RoseBot """
+    
+    def __init__(self, board, pin_number):
+        self.board = board
+        self.pin_number = pin_number
+        self.board.set_pin_mode(pin_number, Constants.OUTPUT)
+        self.state = LOW 
+    
+    def digital_write (self, signal):
+        self.board.digital_write(self.pin_number, signal)
+        self.state = signal
+        
+    def digital_read(self):
+        #TODO: Ask Dr Fisher if this is even a helpful class
+        return self.state
