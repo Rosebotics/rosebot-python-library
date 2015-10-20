@@ -63,14 +63,16 @@ class RoseBotPhysicalConstants:
 class RoseBotConnection(PyMata3):
     """Creates the Pymata connection to the Arduino board with default parameters and returns the Pymata3 object."""
     def __init__(self, ip_address=None, com_port=None):
+        reboot_time = 2
         if ip_address != None:
             print("Connecting to ip address " + ip_address + "...")
+            reboot_time = 0 # Arduino does not reset if using a WiFly.
         elif com_port != None:
             print("Connecting via com port " + com_port + "...")
         else:
             print("Connecting via com port using automatic com port detection...")
-        super().__init__(arduino_wait=0, log_output=True, com_port=com_port, ip_address=ip_address)
-        self.keep_alive(2)
+        super().__init__(arduino_wait=reboot_time, log_output=True, com_port=com_port, ip_address=ip_address)
+        self.keep_alive(period=2.222, margin=.1) # send a keep alive every 2 seconds, if not received within 2.222 reset.
         print("Ready!")
 
 
@@ -110,14 +112,26 @@ class RoseBotEncoder:
         elif encoder_pin_to_reset == PIN_RIGHT_ENCODER:
             self.encoder_count_right = 0
         elif encoder_pin_to_reset == PIN_LEFT_ENCODER:
+<<<<<<< HEAD
             self.encoder_count_left = 0
         
+=======
+            self.left_encoder_count = 0
+
+    def get_ticks(self, encoder_pin):
+        """Pass in the encoder pin value to get the number of ticks for that encoder."""
+        if encoder_pin == PIN_LEFT_ENCODER:
+            return self.left_encoder_count
+        elif encoder_pin == PIN_RIGHT_ENCODER:
+            return self.right_encoder_count
+
+>>>>>>> origin/master
     def get_distance(self):
         """Uses the current encoder ticks and returns a value for the distance traveled in inches. Uses the minimum count of the encoders to ensure that the RoseBot is not just going around in a circle"""
         avg_encoder_count = (self.encoder_count_left + self.encoder_count_right) / 2
         return  WHEEL_CIRC_IN * avg_encoder_count / COUNTS_PER_REV
-        
-    
+
+
 class RoseBotMotors:
     """Controls the motors on the RoseBot."""
 	CLOCKWISE = 0
@@ -271,10 +285,10 @@ class RoseBotBuzzer:
     def __init__(self, board, pin_number):
         self.board = board
         self.pin_number = pin_number
-            
+
     def play_tone(self, note, duration = None):
         self.board.play_tone(self.pin_number, Constants.TONE_TONE, note, duration)
-        
+
     def stop(self):
         self.board.play_tone(self.pin_number, Constants.TONE_NO_TONE, 0, 0)
 
@@ -300,13 +314,13 @@ class RoseBotAnalogInput(RoseBotInput):
 
 class RoseBotDigitalInput(RoseBotInput):
     """Gets digital readings from the RoseBot sensors."""
-    
+
     def __init__(self, board, pin_number):
         super().__init__(board, pin_number)
         self.board.set_pin_mode(pin_number, Constants.INPUT)
         # TODO: Change the 1 to Constants.HIGH once that constant is added.
         self.board.digital_write(pin_number, 1)  # sets pin pull-up resistor. INPUT_PULLUP is not an option with Pymata
-       
+
 
     def read(self):
         return self.board.digital_read(self.pin_number)
@@ -319,24 +333,24 @@ class RoseBotServo:
         self.board = board
         self.pin_number = pin_number
         self.board.servo_config(pin_number)
-        
+
     def write (self, servo_position):
         self.board.analog_write(self.pin_number, servo_position)
-        
-        
+
+
 class RoseBotDigitalOutput:
     """Control digital outputs connected to the RoseBot """
-    
+
     def __init__(self, board, pin_number):
         self.board = board
         self.pin_number = pin_number
         self.board.set_pin_mode(pin_number, Constants.OUTPUT)
-        self.state = LOW 
-    
+        self.state = LOW
+
     def digital_write (self, signal):
         self.board.digital_write(self.pin_number, signal)
         self.state = signal
-        
+
     def digital_read(self):
 	    """Present only if you need to reference later what you wrote to a pin."""
         return self.state
