@@ -1,18 +1,16 @@
-"""# This library gives a simple implementation of a PID controller for the RoseBot.
-# PID controllers output a value for error between desired reference input and measurement feedback to
-# minimize error value.
-#
-# Credit and thanks to cnr437@gmail.com for the majority of this code """
+""" This library gives a simple implementation of a pid controller for the RoseBot.
+ PID controllers output a value for error between desired reference input and measurement feedback to
+ minimize error value."""
 
 
-class RoseBot_PID:
+class RoseBot_pid:
 
 
     def __init__(self, P=1.0, I=0.0, D=0.0, derivator=0, integrator=0, integrator_max=100, integrator_min=-100):
 
-        self.Kp = P
-        self.Ki = I
-        self.Kd = D
+        self.kp = P
+        self.ki = I
+        self.kd = D
         self.derivator = derivator
         self.integrator = integrator
         self.integrator_max = integrator_max
@@ -23,13 +21,13 @@ class RoseBot_PID:
 
     def update(self, current_value):
         """
-        Calculate PID output value for given reference input and feedback
+        Calculate pid output value for given reference input and feedback
         """
 
         self.error = self.set_point - current_value
 
-        self.p_value = self.Kp * self.error
-        self.d_value = self.Kd * (self.error - self.derivator)
+        self.p_value = self.kp * self.error
+        self.d_value = self.kd * (self.error - self.derivator)
         self.derivator = self.error
 
         self.integrator = self.integrator + self.error
@@ -39,43 +37,8 @@ class RoseBot_PID:
         elif self.integrator < self.integrator_min:
             self.integrator = self.integrator_min
 
-        self.i_value = self.integrator * self.Ki
+        self.i_value = self.integrator * self.ki
 
-        PID = self.p_value + self.i_value + self.d_value
+        pid = self.p_value + self.i_value + self.d_value
 
-        return PID
-
-    def set_point(self, set_point):
-        """
-        Initilize the setpoint of PID. Sets the value that the PID control aims to stabilize around
-        """
-        self.set_point = set_point
-        self.integrator = 0
-        self.derivator = 0
-
-    def set_integrator(self, integrator):
-        self.integrator = integrator
-
-    def set_derivator(self, derivator):
-        self.derivator = derivator
-
-    def set_Kp(self, P):
-        self.Kp = P
-
-    def set_Ki(self, I):
-        self.Ki = I
-
-    def set_Kd(self, D):
-        self.Kd = D
-
-    def get_point(self):
-        return self.set_point
-
-    def get_error(self):
-        return self.error
-
-    def get_integrator(self):
-        return self.integrator
-
-    def get_derivator(self):
-        return self.derivator
+        return pid

@@ -17,6 +17,10 @@ DEFAULT_SLEEP_S = 0.025
 CLOCKWISE = 0
 COUNTER_CLOCKWISE = 1
 DEFAULT_MOTOR_SPEED = 150
+INPUT = 0x00  # pin set as input
+OUTPUT = 0x01  # pin set as output
+LOW = 0x00
+HIGH = 0x01
 
 # RoseBot Wheel diameter calculations
 COUNTS_PER_REV = 192  # 4 pairs of N-S x 48:1 gearbox = 192 ticks per wheel rev
@@ -125,13 +129,13 @@ class RoseBotEncoder:
             return self.left_encoder_count
         elif encoder_pin == PIN_RIGHT_ENCODER:
             return self.right_encoder_count
-        
+
     def get_distance(self):
         """Uses the current encoder ticks and returns a value for the distance traveled in inches. Uses the minimum count of the encoders to ensure that the RoseBot is not just going around in a circle"""
         avg_encoder_count = (self.left_encoder_count + self.right_encoder_count) / 2
         return  WHEEL_CIRC_IN * avg_encoder_count / COUNTS_PER_REV
-        
-    
+
+
 class RoseBotMotors:
     """Controls the motors on the RoseBot."""
 
@@ -266,6 +270,17 @@ class RoseBotMotors:
         if encoder_object:
             encoder_object.right_direction = DIRECTION_REVERSE
 
+class RoseBotBuzzer:
+    def __init__(self, board, pin_number):
+        self.board = board
+        self.pin_number = pin_number
+
+    def play_tone(self, note, duration = None):
+        self.board.play_tone(self.pin_number, Constants.TONE_TONE, note, duration)
+
+    def stop(self):
+        self.board.play_tone(self.pin_number, Constants.TONE_NO_TONE, 0, 0)
+
 
 class RoseBotInput:
     """Gets readings from the RoseBot sensors."""
@@ -288,13 +303,13 @@ class RoseBotAnalogInput(RoseBotInput):
 
 class RoseBotDigitalInput(RoseBotInput):
     """Gets digital readings from the RoseBot sensors."""
-    
+
     def __init__(self, board, pin_number):
         super().__init__(board, pin_number)
         self.board.set_pin_mode(pin_number, Constants.INPUT)
         # TODO: Change the 1 to Constants.HIGH once that constant is added.
         self.board.digital_write(pin_number, 1)  # sets pin pull-up resistor. INPUT_PULLUP is not an option with Pymata
-        pass
+
 
     def read(self):
         return self.board.digital_read(self.pin_number)
@@ -302,12 +317,29 @@ class RoseBotDigitalInput(RoseBotInput):
 
 class RoseBotServo:
     """Control servo motors connected to the RoseBot """
-    
+
     def __init__(self, board, pin_number):
         self.board = board
         self.pin_number = pin_number
         self.board.servo_config(pin_number)
 
-    def write(self, servo_position):
+    def write (self, servo_position):
         self.board.analog_write(self.pin_number, servo_position)
 
+
+class RoseBotDigitalOutput:
+    """Control digital outputs connected to the RoseBot """
+
+    def __init__(self, board, pin_number):
+        self.board = board
+        self.pin_number = pin_number
+        self.board.set_pin_mode(pin_number, Constants.OUTPUT)
+        self.state = LOW
+
+    def digital_write (self, signal):
+        self.board.digital_write(self.pin_number, signal)
+        self.state = signal
+
+    def digital_read(self):
+        #TODO: Ask Dr Fisher if this is even a helpful class
+        return self.state
