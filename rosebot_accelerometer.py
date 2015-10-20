@@ -20,6 +20,7 @@ from pymata_aio.constants import Constants
 
 
 class RoseBotAccel:
+#TODO: Revert to the exact version from Alan's github repo
     """
     This library is a direct port of: https://github.com/sparkfun/SparkFun_RoseBotAccel_Arduino_Library/tree/V_1.1.0
     Special Note: All reads have the Constants.I2C_END_TX_MASK bit sit. Most devices do not need to do this, but it
