@@ -30,9 +30,10 @@ class MMA8452Q:
     is required for this chip.
     """
 
-    def __init__(self, address, scale, output_data_rate):
+    def __init__(self, board, address, scale, output_data_rate):
         """
 
+        @param board: Pymata3 instance
         @param address: Address of the device
         @param scale: scale factor
         @param output_data_rate: output data rate
@@ -92,6 +93,9 @@ class MMA8452Q:
         # device id
         self.device_id = 42
 
+        # Reference to the Pymata3 proxy that was supplied.
+        self.board = board
+
         # device address
         self.address = address
 
@@ -108,9 +112,6 @@ class MMA8452Q:
         # beginning of data returned is located at position 4
         # 0 is the device address
         self.data_start = 2
-
-        # pymata3 is acting as a proxy for the Wire library here
-        self.board = PyMata3()
 
         # configure firmata for i2c
         self.board.i2c_config()
