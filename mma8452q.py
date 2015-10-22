@@ -452,15 +452,17 @@ class MMA8452Q:
         return rval
 
 
-accel = MMA8452Q(0x1d, 2, 0)
-while True:
-    if accel.available():
-        values = accel.read()
-        print(
-            '{0:4d}, {1:4d}, {2:4d}, {3:.3f}, {4:.3f}, {5:.3f},  {6:.3f}, {7:.3f}, {8:.3f}, {9:} {10:}'.format(
-                values[0], values[1], values[2], values[3],
-                values[4], values[5], values[6], values[7], values[8],
-                values[9], values[10]))
-    else:
-        print("Where's the device?")
-    accel.board.sleep(.001)
+if __name__ == "__main__":
+    board = PyMata3()
+    accel = MMA8452Q(board, 0x1d, 2, 0)
+    while True:
+        if accel.available():
+            values = accel.read()
+            print(
+                '{0:4d}, {1:4d}, {2:4d}, {3:.3f}, {4:.3f}, {5:.3f},  {6:.3f}, {7:.3f}, {8:.3f}, {9:} {10:}'.format(
+                    values[0], values[1], values[2], values[3],
+                    values[4], values[5], values[6], values[7], values[8],
+                    values[9], values[10]))
+        else:
+            print("Where's the device?")
+        accel.board.sleep(.001)

@@ -56,7 +56,7 @@ class RoseBotPhysicalConstants:
 
 class RoseBotConnection(PyMata3):
     """Creates the Pymata connection to the Arduino board with default parameters and returns the Pymata3 object."""
-    def __init__(self, ip_address=None, com_port=None):
+    def __init__(self, ip_address=None, com_port=None, use_log_file=True):
         reboot_time = 2
         if ip_address != None:
             print("Connecting to ip address " + ip_address + "...")
@@ -65,8 +65,8 @@ class RoseBotConnection(PyMata3):
             print("Connecting via com port " + com_port + "...")
         else:
             print("Connecting via com port using automatic com port detection...")
-        super().__init__(arduino_wait=reboot_time, log_output=True, com_port=com_port, ip_address=ip_address)
-        self.keep_alive(period=2.222, margin=.1) # send a keep alive every 2 seconds, if not received within 2.222 reset.
+        super().__init__(arduino_wait=reboot_time, log_output=use_log_file, com_port=com_port, ip_address=ip_address)
+        self.keep_alive(period=2) # Send keep_alive message at 1.6 seconds, timeout at 2 seconds
         print("Ready!")
 
 
@@ -81,12 +81,12 @@ class RoseBotMotors:
     def __init__(self, board):
         """Constructor for pin setup"""
         self.board = board
-        self.board.set_pin_mode(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_1, Constants.OUTPUT)
-        self.board.set_pin_mode(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_2, Constants.OUTPUT)
-        self.board.set_pin_mode(RoseBotMotors.PIN_LEFT_MOTOR_PWM, Constants.PWM)  # Choosing to set explicitly, not required
-        self.board.set_pin_mode(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_1, Constants.OUTPUT)
-        self.board.set_pin_mode(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_2, Constants.OUTPUT)
-        self.board.set_pin_mode(RoseBotMotors.PIN_RIGHT_MOTOR_PWM, Constants.PWM)  # Choosing to set explicitly, not required
+        self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, Constants.OUTPUT)
+        self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, Constants.OUTPUT)
+        self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, Constants.PWM)  # Choosing to set explicitly, not required
+        self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, Constants.OUTPUT)
+        self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, Constants.OUTPUT)
+        self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, Constants.PWM)  # Choosing to set explicitly, not required
 
     def brake(self):
         """Effectively shorts the two leads of the motor together, which causes the motor to resist being turned.
@@ -96,15 +96,15 @@ class RoseBotMotors:
 
     def left_brake(self):
         """Brakes left motor, stopping it immediately"""
-        self.board.digital_write(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_1, 1)
-        self.board.digital_write(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_2, 1)
-        self.board.analog_write(RoseBotMotors.PIN_LEFT_MOTOR_PWM, 0)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, 0)
 
     def right_brake(self):
         """Brakes right motor, stopping it immediately"""
-        self.board.digital_write(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_1, 1)
-        self.board.digital_write(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_2, 1)
-        self.board.analog_write(RoseBotMotors.PIN_RIGHT_MOTOR_PWM, 0)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, 0)
 
     def drive_pwm(self, left_pwm, right_pwm=None):
         """Drive the left and right motors using pwm values.
@@ -169,9 +169,9 @@ class RoseBotMotors:
     # ******************************************************************************/
     def _left_fwd(self, pwm):
         """Sets the H-Bridge control lines to forward and sets the PWM value."""
-        self.board.digital_write(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_1, 1)
-        self.board.digital_write(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_2, 0)
-        self.board.analog_write(RoseBotMotors.PIN_LEFT_MOTOR_PWM, pwm)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, 0)
+        self.board.analog_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
@@ -179,9 +179,9 @@ class RoseBotMotors:
 
     def _left_rev(self, pwm):
         """Sets the H-Bridge control lines to reverse and sets the PWM value."""
-        self.board.digital_write(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_1, 0)
-        self.board.digital_write(RoseBotMotors.PIN_LEFT_MOTOR_CONTROL_2, 1)
-        self.board.analog_write(RoseBotMotors.PIN_LEFT_MOTOR_PWM, pwm)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 0)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
@@ -189,9 +189,9 @@ class RoseBotMotors:
 
     def _right_fwd(self, pwm):
         """Sets the H-Bridge control lines to forward and sets the PWM value."""
-        self.board.digital_write(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_1, 1)
-        self.board.digital_write(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_2, 0)
-        self.board.analog_write(RoseBotMotors.PIN_RIGHT_MOTOR_PWM, pwm)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, 1)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 0)
+        self.board.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
@@ -199,9 +199,9 @@ class RoseBotMotors:
 
     def _right_rev(self, pwm):
         """Sets the H-Bridge control lines to reverse and sets the PWM value."""
-        self.board.digital_write(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_1, 0)
-        self.board.digital_write(RoseBotMotors.PIN_RIGHT_MOTOR_CONTROL_2, 1)
-        self.board.analog_write(RoseBotMotors.PIN_RIGHT_MOTOR_PWM, pwm)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, 0)
+        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 1)
+        self.board.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, pwm)
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
