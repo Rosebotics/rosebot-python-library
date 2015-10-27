@@ -1,7 +1,7 @@
 import math,time
 from pymata_aio.constants import Constants
 from pymata_aio.pymata3 import PyMata3
-from mma8452q3 import MMA8452Q3
+from .mma8452q3 import MMA8452Q3
 
 
 class RoseBotConstants:
@@ -345,8 +345,11 @@ class RoseBotBuzzer:
         self.board = board
         self.pin_number = pin_number
 
-    def play_tone(self, note, duration=None):
-        self.board.play_tone(self.pin_number, Constants.TONE_TONE, note, duration)
+    def play_tone(self, note, duration_s=None):
+        duration_ms = None
+        if duration_s != None:
+            duration_ms = int(duration_s * 1000) 
+        self.board.play_tone(self.pin_number, Constants.TONE_TONE, note, duration_ms)
 
     def stop(self):
         self.board.play_tone(self.pin_number, Constants.TONE_NO_TONE, 0)
