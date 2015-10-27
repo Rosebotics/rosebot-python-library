@@ -50,7 +50,7 @@ class RoseBotPhysicalConstants:
     # TODO: Make our only distance unit be cm.
     COUNTS_PER_REV = 192  # 4 pairs of N-S x 48:1 gearbox = 192 ticks per wheel rev
     WHEEL_DIAM_CM = 6.5  # diam = 65mm / 25.4 mm/in WHEEL_CIRC_CM = math.pi * WHEEL_DIAM
-    WHEEL_TRACK_WIDTH = 15  # approx 7.5 centimeters from centre of the RoseBot (pivot point) to the wheels. Used to calculate turning angles
+    WHEEL_TRACK_WIDTH_CM = 15  # approx 7.5 centimeters from centre of the RoseBot (pivot point) to the wheels. Used to calculate turning angles
     WHEEL_CIRC_CM = math.pi * WHEEL_DIAM_CM
 
 
@@ -77,8 +77,9 @@ class RoseBotMotors:
     DEFAULT_MOTOR_SPEED = 150
     DIRECTION_FORWARD = 1
     DIRECTION_REVERSE = -1
-    PWM_TO_SPEED_RATIO = 3.75 # when not using this will give relatively accurate
-    PWM_OFFSET = 30 # this offset is due to the physical offset required to get the wheels initially driving
+    # PWM duty cycle = PWM_DC_PER_CM_S_SPEED_MULTIPLIER * Desired cm/s speed + PWM_OFFSET
+    PWM_DC_PER_CM_S_SPEED_MULTIPLIER = 3.75 # when not usingencoder  this will give relatively accurate duty cycles
+    PWM_OFFSET = 30 # this offset is due to the physical offset required to get the wheels initially driving when not
     
     def __init__(self, board):
         """Constructor for pin setup"""
@@ -148,19 +149,24 @@ class RoseBotMotors:
             self.board.sleep(RoseBotConstants.SAMPLING_INTERVAL_S)
         self.brake()        
         
-    def drive_speed(self, speed_cm_per_s_left_motor, speed_cm_per_s_right_motor=None):
-       """Function used to drive the RoseBot motors at a given speed, designated in cm/s""" 
-       if RoseBotPid.shared_rosebot_pid == None:
+    def drive_at_speed(self, speed_cm_per_s_left_motor, use_encoder_feedback = False, speed_cm_per_s_right_motor=None):
+        """Function used to drive the RoseBot motors at a given speed, designated in cm/s""" 
+        pwm_left_motor = speed_cm_per_s_left_motor * RoseBotMotors.PWM_DC_PER_CM_S_SPEED_MULTIPLIER + RoseBotMotors.PWM_OFFSET
+        if speed_cm_per_s_right_motor==None:
+            pwm_right_motor = pwm_left_motor
+        else:
+            pwm_right_motor = speed_cm_per_s_right_motor*RoseBotMotors.PWM_DC_PER_CM_S_SPEED_MULTIPLIER+RoseBotMotors.PWM_OFFSET
+        
+        if use_encoder_feedback: 
+            if RoseBotPid.shared_pid == None:
+                RoseBotPid()
+                print("Initialized PID controller for encoder feedback")
+            RoseBotPid.shared_pid.set_point = speed_cm_per_s  # sets the desired final speed to the speed entered into the method
+            RoseBotMotors.drive_pwm(self, left_pwm, right_pwm)
+            
+        else:
             print("Note: Not using PID control to measure speed, speed will not be highly accurate")            
-            pwm_left_motor = speed_cm_per_s_left_motor*RoseBotMotors.PWM_TO_SPEED_RATIO+RoseBotMotors.PWM_OFFSET
-            if speed_cm_per_s_right_motor==None:
-                pwm_right_motor = pwm_left_motor
-            else :
-                pwm_right_motor = speed_cm_per_s_right_motor*RoseBotMotors.PWM_TO_SPEED_RATIO+RoseBotMotors.PWM_OFFSET
             self.drive_pwm(int(pwm_left_motor), int(pwm_right_motor))
-#         else:
-#             RoseBotPid.shared_rosebot_pid.set_point = speed_cm_per_s  # sets the desired final speed to the speed entered into the method
-#             RoseBotMotors.drive_pwm(self, left_pwm, right_pwm)
 #             
         
         
@@ -168,7 +174,7 @@ class RoseBotMotors:
         """Turns a certain number of degrees (negative is a left turn counterclockwise, positive is a right turn clockwise)"""
         self.clear_enc()
         angle_radians = math.radians(angle_degrees)
-        arc_length = RoseBotPhysicalConstants.WHEEL_TRACK_WIDTH / 2.0 * angle_radians
+        arc_length = RoseBotPhysicalConstants.WHEEL_TRACK_WIDTH_CM / 2.0 * angle_radians
         angle_wanted_in_ticks = arc_length / RoseBotPhysicalConstants.WHEEL_CIRC_CM * RoseBotPhysicalConstants.COUNTS_PER_REV
         if angle_degrees < 0:
             self.motors.drive_left(motor_pwm)
@@ -285,7 +291,7 @@ class RoseBotEncoder:
         TODO: Work out how to do that accurately"""
         diff_in_encoder_counts = self.count_left-self.count_right
         relative_arc_length_traveled = diff_in_encoder_counts*RoseBotPhysicalConstants.WHEEL_CIRC_CM
-        angle_in_radians = relative_arc_length_traveled/(RoseBotPhysicalConstants.WHEEL_TRACK_WIDTH/2)
+        angle_in_radians = relative_arc_length_traveled/(RoseBotPhysicalConstants.WHEEL_TRACK_WIDTH_CM/2)
         
         return math.degrees(angle_in_radians)
         
@@ -383,11 +389,11 @@ class RoseBotPid:
     """
      This class provides a simple implementation of a pid controller for the RoseBot.
     """
-    shared_rosebot_pid = None  # creates the only instance of the pid class
+    shared_pid = None  # creates the only instance of the pid class
 
     def __init__(self, kp=1.0, ki=0.0, kd=0.0, integrator_max=100, integrator_min=-100):
         """Create a PID instance with gains provided."""
-        RoseBotPid.shared_rosebot_pid = self
+        RoseBotPid.shared_pid = self
         self.kp = kp
         self.ki = ki
         self.kd = kd
