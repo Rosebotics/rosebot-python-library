@@ -84,8 +84,7 @@ class RoseBotMotors:
     
     def __init__(self, board):
         """Constructor for pin setup"""
-        RoseBotMotors.shared_motors = self
-        self.pwm_value_left = 0
+        RoseBotMotors.shared_motors = self  # Save a global reference to the one and only motor instance 
         self.pwm_value_right = 0
         self.board = board
         self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, Constants.OUTPUT)
@@ -143,7 +142,6 @@ class RoseBotMotors:
 
     def drive_distance(self, distance_cm, left_pwm, right_pwm=None):
         """Drives a certain distance in cm then stops with independent motor pwm values."""
-        # TODO: Remove all pwm stuff.  Replace with speed_cm_per_s stuff.
         if right_pwm is None:  # If no right_speed is entered, then the right motor speed mirrors the left motor
             right_pwm = left_pwm
         num_ticks = distance_cm / RoseBotPhysicalConstants.WHEEL_CIRC_CM * RoseBotPhysicalConstants.COUNTS_PER_REV
@@ -165,11 +163,11 @@ class RoseBotMotors:
         pwm_right_motor = speed_cm_per_s_right_motor * RoseBotMotors.PWM_DC_PER_CM_S_SPEED_MULTIPLIER + RoseBotMotors.PWM_OFFSET
         self.pwm_value_left = pwm_left_motor
         self.pwm_value_right = pwm_right_motor
+        
         if use_encoder_feedback:
             if RoseBotEncoder.shared_encoder is None:
                RoseBotEncoder(self.board) 
             RoseBotEncoder.shared_encoder.update_shared_pids_on_encoder_callback = True
-            
             if RoseBotPid.shared_pid_left == None:
                 print("Initialized PID controller for left encoder feedback")
                 RoseBotPid.shared_pid_left = RoseBotPid(set_point=speed_cm_per_s_left_motor)
@@ -179,6 +177,9 @@ class RoseBotMotors:
                 print("Initialized PID controller for right encoder feedback")
                 RoseBotPid.shared_pid_right = RoseBotPid(set_point=speed_cm_per_s_right_motor)
                 RoseBotEncoder.shared_encoder.count_right_at_last_update = RoseBotEncoder.shared_encoder.count_right
+        else:
+            RoseBotEncoder.shared_encoder.update_shared_pids_on_encoder_callback = False
+        RoseBotEncoder.shared_encoder.reset_encoder_counts()
         self.drive_pwm(int(pwm_left_motor), int(pwm_right_motor))
         
     def turn_angle(self, angle_degrees, motor_pwm=DEFAULT_MOTOR_SPEED):
@@ -211,7 +212,11 @@ class RoseBotMotors:
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
             RoseBotEncoder.shared_encoder.left_direction = self.DIRECTION_FORWARD
-
+    
+    def print_something(self): 
+        #TODO: remove this method. Only for debugging the shared_motors.drive_pwm() problem
+        print("This prints, so this musn't be the problem") 
+             
     def _left_rev(self, pwm):
         """Sets the H-Bridge control lines to reverse and sets the PWM value."""
         self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 0)
@@ -247,8 +252,8 @@ class RoseBotEncoder:
     """Track the encoder ticks.  This class should only be instantiated once and a shared reference used to
        communicate with the RoseMotor class."""
 
-    shared_encoder = None # Instance of the RoseBotEncoder that is shared wit the RoseBotMotor class.
-
+    shared_encoder = None # Instance of the RoseBotEncoder that is shared with the RoseBotMotor class.
+    i = 0
     def __init__(self, board):
         RoseBotEncoder.shared_encoder = self  # Save a global reference to the one and only encoder instance so that the motors can set the direction.
         self.board = board
@@ -262,7 +267,7 @@ class RoseBotEncoder:
         self.right_direction = RoseBotMotors.DIRECTION_FORWARD  # default to forward if not set
         board.encoder_config(RoseBotPhysicalConstants.PIN_LEFT_ENCODER, RoseBotPhysicalConstants.PIN_RIGHT_ENCODER, self._encoder_callback,
                              Constants.CB_TYPE_DIRECT, True)
-
+        
     def _encoder_callback(self, data):
         """Internal callback when encoder data updates."""
         
@@ -276,18 +281,24 @@ class RoseBotEncoder:
             self.count_right -= data[1]
         if self.update_shared_pids_on_encoder_callback:
             # TODO: Implement the encoder feedback to actually update the wheel pwms.
+            
             self._update_speeds_based_on_encoder_feedback()            
-            adj_left = int(RoseBotMotors.shared_motors.pwm_value_left-RoseBotPid.shared_pid_left.update(self.speed_left))
-            adj_right = int(RoseBotMotors.shared_motors.pwm_value_right-RoseBotPid.shared_pid_right.update(self.speed_right))
-            print(adj_left)
-            RoseBotMotors.drive_pwm(adj_left, adj_right)
+            adj_left = int(RoseBotMotors.shared_motors.pwm_value_left+RoseBotPid.shared_pid_left.update(self.speed_left))
+            adj_right = int(RoseBotMotors.shared_motors.pwm_value_right+RoseBotPid.shared_pid_right.update(self.speed_right))
+            adj_left = min(abs(adj_left), 255)
+            adj_right = min(abs(adj_right), 255)
+        
+        ######### THIS IS THE PART THAT DOESN'T WORK. It does not seem to be possible to call a board.write of any kind from within the callback
+            RoseBotMotors.shared_motors.drive_pwm(adj_left,adj_right)
+#             print("Left PWM: {}  Right PWM: {}".format(adj_left,adj_right))
+        ###########################################################################################################              
 
     def reset_encoder_counts(self):
         """Clears the encoder count accumulators.
            Optionally you can pass in the encoder pin value to reset only 1 of the two encoder counters."""
         self.count_left = 0
         self.count_right = 0
-
+        
     def get_distance(self):
         """Uses the current encoder ticks and returns a value for the distance traveled in centimeters. Uses the minimum count of the encoders to ensure that the RoseBot is not just going around in a circle"""
         avg_encoder_count = (self.count_left + self.count_right) / 2
@@ -392,6 +403,7 @@ class RoseBotDigitalOutput:
     def digital_read(self):
         """Present only if you need to reference later what you wrote to a pin."""
         return self.state
+    
 
 class RoseBotPid:
     """
@@ -411,6 +423,7 @@ class RoseBotPid:
         self.integrator_min = integrator_min
         self.set_point = set_point
         self.error = 0.0
+        
 
     def update(self, current_value):
         """Calculate pid output value for the given input."""
@@ -424,7 +437,6 @@ class RoseBotPid:
         elif self.integrator < self.integrator_min:
             self.integrator = self.integrator_min
         self.i_value = self.integrator * self.ki
-        
         return self.p_value + self.i_value + self.d_value
 
 
