@@ -1,7 +1,7 @@
 import math,time
 from pymata_aio.constants import Constants
 from pymata_aio.pymata3 import PyMata3
-from .mma8452q import MMA8452Q
+from mma8452q3 import MMA8452Q
 
 
 class RoseBotConstants:
@@ -423,7 +423,7 @@ class RoseBotPid:
 
 
 class RoseBotAccelerometer(MMA8452Q):
-    """An import of the mma8452q library"""
+    """An import of the mma8452q3 library"""
     
     # Positions in the returned array for the accel.read() function
     VAL_RAW_X = 0
