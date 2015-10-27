@@ -80,9 +80,13 @@ class RoseBotMotors:
     # PWM duty cycle = PWM_DC_PER_CM_S_SPEED_MULTIPLIER * Desired cm/s speed + PWM_OFFSET
     PWM_DC_PER_CM_S_SPEED_MULTIPLIER = 3.75 # when not usingencoder  this will give relatively accurate duty cycles
     PWM_OFFSET = 30 # this offset is due to the physical offset required to get the wheels initially driving when not
+    shared_motors = None
     
     def __init__(self, board):
         """Constructor for pin setup"""
+        RoseBotMotors.shared_motors = self
+        self.pwm_value_left = 0
+        self.pwm_value_right = 0
         self.board = board
         self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, Constants.OUTPUT)
         self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, Constants.OUTPUT)
@@ -90,6 +94,7 @@ class RoseBotMotors:
         self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, Constants.OUTPUT)
         self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, Constants.OUTPUT)
         self.board.set_pin_mode(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, Constants.PWM)  # Choosing to set explicitly, not required
+        self.brake()  #  Just to make sure we start from a known state
         
     def brake(self):
         """Effectively shorts the two leads of the motor together, which causes the motor to resist being turned.
@@ -115,6 +120,8 @@ class RoseBotMotors:
         """
         if right_pwm is None:  # If no right_pwm is entered, then the right motor speed mirrors the left motor
             right_pwm = left_pwm
+        self.pwm_value_left = left_pwm
+        self.pwm_value_right = right_pwm
         self.drive_pwm_left(left_pwm)
         self.drive_pwm_right(right_pwm)
 
@@ -143,6 +150,8 @@ class RoseBotMotors:
         RoseBotEncoder.shared_encoder.reset_encoder_counts()  # clear the encoder count
         self.drive_left(left_pwm)
         self.drive_right(right_pwm)
+        self.pwm_value_left = left_pwm
+        self.pwm_value_right = right_pwm
         while RoseBotEncoder.shared_encoder.count_right < num_ticks  or \
                 RoseBotEncoder.shared_encoder.count_left < num_ticks:
             self.board.sleep(RoseBotConstants.SAMPLING_INTERVAL_S)
@@ -154,7 +163,13 @@ class RoseBotMotors:
             speed_cm_per_s_right_motor = speed_cm_per_s_left_motor
         pwm_left_motor = speed_cm_per_s_left_motor * RoseBotMotors.PWM_DC_PER_CM_S_SPEED_MULTIPLIER + RoseBotMotors.PWM_OFFSET
         pwm_right_motor = speed_cm_per_s_right_motor * RoseBotMotors.PWM_DC_PER_CM_S_SPEED_MULTIPLIER + RoseBotMotors.PWM_OFFSET
-        if use_encoder_feedback: 
+        self.pwm_value_left = pwm_left_motor
+        self.pwm_value_right = pwm_right_motor
+        if use_encoder_feedback:
+            if RoseBotEncoder.shared_encoder is None:
+               RoseBotEncoder(self.board) 
+            RoseBotEncoder.shared_encoder.update_shared_pids_on_encoder_callback = True
+            
             if RoseBotPid.shared_pid_left == None:
                 print("Initialized PID controller for left encoder feedback")
                 RoseBotPid.shared_pid_left = RoseBotPid(set_point=speed_cm_per_s_left_motor)
@@ -250,6 +265,7 @@ class RoseBotEncoder:
 
     def _encoder_callback(self, data):
         """Internal callback when encoder data updates."""
+        
         if self.left_direction == RoseBotMotors.DIRECTION_FORWARD:
             self.count_left += data[0]
         else:
@@ -260,8 +276,11 @@ class RoseBotEncoder:
             self.count_right -= data[1]
         if self.update_shared_pids_on_encoder_callback:
             # TODO: Implement the encoder feedback to actually update the wheel pwms.
-            RoseBotPid.shared_pid_left.update()
-            RoseBotPid.shared_pid_left.update()
+            self._update_speeds_based_on_encoder_feedback()            
+            adj_left = int(RoseBotMotors.shared_motors.pwm_value_left-RoseBotPid.shared_pid_left.update(self.speed_left))
+            adj_right = int(RoseBotMotors.shared_motors.pwm_value_right-RoseBotPid.shared_pid_right.update(self.speed_right))
+            print(adj_left)
+            RoseBotMotors.drive_pwm(adj_left, adj_right)
 
     def reset_encoder_counts(self):
         """Clears the encoder count accumulators.
@@ -283,9 +302,10 @@ class RoseBotEncoder:
         angle_in_radians = relative_arc_length_traveled / (RoseBotPhysicalConstants.WHEEL_TRACK_WIDTH_CM / 2)
         return math.degrees(angle_in_radians)
         
-    def update_speed(self):
+    def _update_speeds_based_on_encoder_feedback(self):
+        """Updates the speed_left and speed_right variables for the encoders object"""
         # TODO: Get this working. Having problems with the speed updates being able to keep up.
-        current_time = time.perf_counter
+        current_time = time.perf_counter()
         delta_sec = current_time - self.time_of_last_update
         self.speed_left = (self.count_left - self.count_left_at_last_update) / delta_sec
         self.speed_right = (self.count_right - self.count_right_at_last_update) / delta_sec
@@ -380,7 +400,7 @@ class RoseBotPid:
     shared_pid_left = None  # shared reference to the PID controller for the left motor
     shared_pid_right = None  # shared reference to the PID controller for the left motor
 
-    def __init__(self, kp=1.0, ki=0.0, kd=0.0, integrator_max=100, integrator_min=-100, set_point=0.0):
+    def __init__(self, kp=0.2, ki=0.0, kd=0.0, integrator_max=100, integrator_min=-100, set_point=0.0):
         """Create a PID instance with gains provided."""
         self.kp = kp
         self.ki = ki
@@ -404,7 +424,7 @@ class RoseBotPid:
         elif self.integrator < self.integrator_min:
             self.integrator = self.integrator_min
         self.i_value = self.integrator * self.ki
-
+        
         return self.p_value + self.i_value + self.d_value
 
 
