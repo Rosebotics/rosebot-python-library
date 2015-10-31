@@ -1,4 +1,4 @@
-import math,time
+import math,time,asyncio
 from pymata_aio.constants import Constants
 from pymata_aio.pymata3 import PyMata3
 from .mma8452q3 import MMA8452Q3
@@ -205,9 +205,9 @@ class RoseBotMotors:
     # ******************************************************************************/
     def _left_fwd(self, pwm):
         """Sets the H-Bridge control lines to forward and sets the PWM value."""
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 1)
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, 0)
-        self.board.analog_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, pwm)
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 1))
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, 0))
+        asyncio.ensure_future(self.board.core.analog_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, pwm))
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
@@ -219,9 +219,9 @@ class RoseBotMotors:
              
     def _left_rev(self, pwm):
         """Sets the H-Bridge control lines to reverse and sets the PWM value."""
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 0)
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, 1)
-        self.board.analog_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, pwm)
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_1, 0))
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_CONTROL_2, 1))
+        asyncio.ensure_future(self.board.core.analog_write(RoseBotPhysicalConstants.PIN_LEFT_MOTOR_PWM, pwm))
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
@@ -229,9 +229,9 @@ class RoseBotMotors:
 
     def _right_fwd(self, pwm):
         """Sets the H-Bridge control lines to forward and sets the PWM value."""
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, 1)
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 0)
-        self.board.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, pwm)
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, 1))
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 0))
+        asyncio.ensure_future(self.board.core.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, pwm))
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
@@ -239,9 +239,9 @@ class RoseBotMotors:
 
     def _right_rev(self, pwm):
         """Sets the H-Bridge control lines to reverse and sets the PWM value."""
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, 0)
-        self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 1)
-        self.board.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, pwm)
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_1, 0))
+        asyncio.ensure_future(self.board.core.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 1))
+        asyncio.ensure_future(self.board.core.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, pwm))
         # If we have an encoder in the system, we want to make sure that it counts
         # in the right direction when ticks occur.
         if RoseBotEncoder.shared_encoder:
@@ -270,7 +270,6 @@ class RoseBotEncoder:
         
     def _encoder_callback(self, data):
         """Internal callback when encoder data updates."""
-        
         if self.left_direction == RoseBotMotors.DIRECTION_FORWARD:
             self.count_left += data[0]
         else:
@@ -287,11 +286,13 @@ class RoseBotEncoder:
             adj_right = int(RoseBotMotors.shared_motors.pwm_value_right+RoseBotPid.shared_pid_right.update(self.speed_right))
             adj_left = min(abs(adj_left), 255)
             adj_right = min(abs(adj_right), 255)
-        
-        ######### THIS IS THE PART THAT DOESN'T WORK. It does not seem to be possible to call a board.write of any kind from within the callback
+            
+            ######### THIS IS THE PART THAT DOESN'T WORK. It does not seem to be possible to call a board.write of any kind from within the callback
             RoseBotMotors.shared_motors.drive_pwm(adj_left,adj_right)
-#             print("Left PWM: {}  Right PWM: {}".format(adj_left,adj_right))
-        ###########################################################################################################              
+            
+#             print("Left PWM: {}  Right PWM: {}  Left Speed: {}   Right Speed: {} ".format(adj_left,adj_right, self.speed_left,self.speed_right))
+            
+            ###########################################################################################################              
 
     def reset_encoder_counts(self):
         """Clears the encoder count accumulators.
@@ -318,8 +319,8 @@ class RoseBotEncoder:
         # TODO: Get this working. Having problems with the speed updates being able to keep up.
         current_time = time.perf_counter()
         delta_sec = current_time - self.time_of_last_update
-        self.speed_left = (self.count_left - self.count_left_at_last_update) / delta_sec
-        self.speed_right = (self.count_right - self.count_right_at_last_update) / delta_sec
+        self.speed_left = (self.count_left - self.count_left_at_last_update) / delta_sec*(RoseBotPhysicalConstants.WHEEL_CIRC_CM/RoseBotPhysicalConstants.COUNTS_PER_REV)
+        self.speed_right = (self.count_right - self.count_right_at_last_update) / delta_sec*(RoseBotPhysicalConstants.WHEEL_CIRC_CM/RoseBotPhysicalConstants.COUNTS_PER_REV)
         self.time_of_last_update = current_time
         self.count_left_at_last_update = self.count_left
         self.count_right_at_last_update = self.count_right
@@ -412,7 +413,7 @@ class RoseBotPid:
     shared_pid_left = None  # shared reference to the PID controller for the left motor
     shared_pid_right = None  # shared reference to the PID controller for the left motor
 
-    def __init__(self, kp=0.2, ki=0.0, kd=0.0, integrator_max=100, integrator_min=-100, set_point=0.0):
+    def __init__(self, kp=0.4, ki=0.0, kd=0.0, integrator_max=100, integrator_min=-100, set_point=0.0):
         """Create a PID instance with gains provided."""
         self.kp = kp
         self.ki = ki
