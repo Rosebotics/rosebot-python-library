@@ -383,9 +383,9 @@ class RoseBotInput:
 class RoseBotAnalogInput(RoseBotInput):
     """Gets analog readings from the RoseBot sensors."""
 
-    def __init__(self, board, pin_number):
+    def __init__(self, board, pin_number,callback=None):
         super().__init__(board, pin_number)
-        board.set_pin_mode(pin_number, Constants.ANALOG)
+        board.set_pin_mode(pin_number, Constants.ANALOG, callback, Constants.CB_TYPE_DIRECT)
 
     def read(self):
         return self.board.analog_read(self.pin_number)
@@ -394,9 +394,9 @@ class RoseBotAnalogInput(RoseBotInput):
 class RoseBotDigitalInput(RoseBotInput):
     """Gets digital readings from the RoseBot sensors."""
 
-    def __init__(self, board, pin_number, callback = None):
+    def __init__(self, board, pin_number, callback=None):
         super().__init__(board, pin_number)
-        self.board.set_pin_mode(pin_number, Constants.INPUT, callback = callback)
+        self.board.set_pin_mode(pin_number, Constants.INPUT, callback, Constants.CB_TYPE_DIRECT)
         self.board.digital_write(pin_number, 1)  # sets pin pull-up resistor. INPUT_PULLUP is not an option with Pymata       
         board.sleep(RoseBotConstants.SAMPLING_INTERVAL_S) # allows time for stabilization of signal before it is read
         
@@ -516,66 +516,46 @@ class RoseBotAccelerometer(MMA8452Q3):
         
         
 class RoseBotPixy:
-    shared_pixy = None
-#     i = 0   #  TODO: having trouble with getting callbacks to work properly. Ask Dr. Fisher about possible probs
     
     PIXY_RCS_MIN_POS = 0
     PIXY_RCS_MAX_POS = 1000
     PIXY_RCS_CENTER_POS = 500
     
-    def __init__(self, board, max_blocks=None, callb=None, callb_type=Constants.CB_TYPE_DIRECT):
+    def __init__(self, board, pixy_callback=None):
         self.board = board        
-        RoseBotPixy.shared_pixy = self
         self.pos_pan = 90
-        self.pos_tilt = 90
-        self.blocks = self.get_blocks()       
-        board.pixy_init(max_blocks=1, cb=RoseBotPixy.get_blocks, cb_type=Constants.CB_TYPE_DIRECT)        
-        print("Successfully created a new Pixy object")
-    
+        self.pos_tilt = 90 
+        board.pixy_init(max_blocks=3, cb=pixy_callback, cb_type=Constants.CB_TYPE_DIRECT)        
+            
     def get_blocks(self):
-#         RoseBotPixy.i += 1
-#         print("{}".format(RoseBotPixy.i))
-#         print("This works")
-        self.blocks = self.board.pixy_get_blocks()        
-        return self.blocks
+        """Returns the list of all found Pixy blocks"""
+        return self.board.pixy_get_blocks()
     
-    def object_found(self, min_object_size=0, min_object_width = 0, min_object_height = 0):
-        """Returns a boolean of whether an object was detected of a minimum given area by the Pixy at the last check"""    
-        #TODO: Ask Dr. Fisher about why callback isn't working. Ask if finding min width, height is useful
-        self.blocks = self.get_blocks()
+    def get_block(self, required_signature=None, min_width=0, min_height=0):
+        """Returns the largest block (or None) that matches the given criteria"""    
+        blocks = self.get_blocks()               
+        if len(blocks) == 0:
+            return None        
+        for block in blocks:
+            acceptable_signature = required_signature is None or required_signature == block["signature"]
+            acceptable_height = block["height"] >= min_height
+            acceptable_width = block["width"] >= min_width
+            if acceptable_signature and acceptable_height and acceptable_width: 
+                return block
         
-        
-        if len(self.blocks) == 0 :
-            return False
-        else:
-            largest_object = self.blocks[0]
-            object_size = largest_object["width"]*largest_object["height"]
-            object_width = largest_object["width"]
-            object_height = largest_object["height"]
-            if object_size<min_object_size or object_height< min_object_height \
-            or object_width<min_object_width:
-                return False
-            else:
-                return True
+        return None  # No matching block found
         
      
-    def object_position(self):
-        """Gives the x-y coordinates of the largest detected object"""    
-        print("hello")
-        if shared_pixy.object_found():
-            pass
-        else: 
-            print("Pixy: cannot detect object")
-        
-        return x_pos,y_pos 
+    def get_block_position(self, required_signature=None, min_width=0, min_height=0):
+        """Returns an x-y tuple (or None) of the best matching block"""
+        block = self.get_block(required_signature, min_width, min_height)
+        if block is None:
+            return None
+        return block["x"], block["y"]
      
     def print_blocks(self):
         """ Prints the Pixy blocks data."""
-        print("Detected " + str(len(self.blocks)) + " Pixy blocks:")
-        if len(self.blocks) > 0 and not "signature" in self.blocks[0]:
-            print("Something went wrong.  This does not appear to be a printable block.")
-            self.board.shutdown()
-            return
+        print("Detected " + str(len(self.blocks)) + " Pixy blocks:")        
         for block_index in range(len(self.blocks)):
             self.block = self.blocks[block_index]
             print("  block {}: sig: {}  x: {} y: {} width: {} height: {}".format(
