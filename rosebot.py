@@ -514,7 +514,20 @@ class RoseBotAccelerometer(MMA8452Q3):
         super().__init__(board, DEVICE_ADDRESS, SCALE, OUTPUT_DATA_RATE)
         self.board = board
         
+class PixyBlock:
+    """Model object class that holds Pixy readings"""      
+    def __init__ (self, pixy_block_dictionary):
+        self.signature = pixy_block_dictionary["signature"]
+        self.x = pixy_block_dictionary["x"]
+        self.y = pixy_block_dictionary["y"]
+        self.width = pixy_block_dictionary["width"]
+        self.height = pixy_block_dictionary["height"]  
+        self.angle = pixy_block_dictionary["angle"]
         
+    def size(self):
+        return self.width * self.height
+    
+    
 class RoseBotPixy:
     
     PIXY_RCS_MIN_POS = 0
@@ -529,39 +542,34 @@ class RoseBotPixy:
             
     def get_blocks(self):
         """Returns the list of all found Pixy blocks"""
-        return self.board.pixy_get_blocks()
+        blocks = []
+        raw_blocks = self.board.pixy_get_blocks()
+        if raw_blocks is not None:
+            for raw_block in raw_blocks:
+                blocks.append(PixyBlock(raw_block))               
+        return blocks
     
-    def get_block(self, required_signature=None, min_width=0, min_height=0):
+    def get_block(self, required_signature=None, min_size=0):
         """Returns the largest block (or None) that matches the given criteria"""    
         blocks = self.get_blocks()               
         if len(blocks) == 0:
             return None        
         for block in blocks:
-            acceptable_signature = required_signature is None or required_signature == block["signature"]
-            acceptable_height = block["height"] >= min_height
-            acceptable_width = block["width"] >= min_width
-            if acceptable_signature and acceptable_height and acceptable_width: 
+            acceptable_signature = required_signature is None or required_signature == block.signature
+            if acceptable_signature and block.size() >= min_size:
                 return block
         
         return None  # No matching block found
         
      
-    def get_block_position(self, required_signature=None, min_width=0, min_height=0):
-        """Returns an x-y tuple (or None) of the best matching block"""
-        block = self.get_block(required_signature, min_width, min_height)
-        if block is None:
-            return None
-        return block["x"], block["y"]
-     
     def print_blocks(self):
         """ Prints the Pixy blocks data."""
-        print("Detected " + str(len(self.blocks)) + " Pixy blocks:")        
-        for block_index in range(len(self.blocks)):
-            self.block = self.blocks[block_index]
-            print("  block {}: sig: {}  x: {} y: {} width: {} height: {}".format(
-                    block_index, self.block["signature"], self.block["x"], self.block["y"],\
-                     self.block["width"], self.block["height"]))
-    
+        blocks = self.get_blocks() 
+        print("Detected " + str(len(blocks)) + " Pixy blocks:")        
+        for block in blocks:            
+            print(str(block))
+            print("  sig: {}  x: {} y: {} width: {} height: {}".format( \
+                    block.signature, block.x, block.y, block.width, block.height))
  
     def servo_pan_write(self, pos):
         self.pos_pan = int(1000/180*pos)
