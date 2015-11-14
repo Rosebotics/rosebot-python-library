@@ -567,7 +567,6 @@ class RoseBotPixy:
         blocks = self.get_blocks()
         print("Detected " + str(len(blocks)) + " Pixy blocks:")
         for block in blocks:
-            print(str(block))
             print("  sig: {}  x: {} y: {} width: {} height: {}".format( \
                     block.signature, block.x, block.y, block.width, block.height))
 
