@@ -1,4 +1,4 @@
-import math,time,asyncio, logging
+import math, time, asyncio, logging
 from pymata_aio.constants import Constants
 from pymata_aio.pymata3 import PyMata3
 from .mma8452q3 import MMA8452Q3
@@ -14,26 +14,26 @@ class RoseBotConstants:
 
 class RoseBotPhysicalConstants:
     PIN_A0 = 0
-    PIN_A0_AS_DIGITAL = 14 # Also used for SoftwareSerial Tx
+    PIN_A0_AS_DIGITAL = 14  # Also used for SoftwareSerial Tx
     PIN_A1 = 1
-    PIN_A1_AS_DIGITAL = 15 # Also used for SoftwareSerial Rx
+    PIN_A1_AS_DIGITAL = 15  # Also used for SoftwareSerial Rx
     PIN_A2 = 2
-    PIN_A2_AS_DIGITAL = 16 # Commonly used for the left encoder
-    PIN_A3 = 3 # Commonly used for left line or distance sensor
+    PIN_A2_AS_DIGITAL = 16  # Commonly used for the left encoder
+    PIN_A3 = 3  # Commonly used for left line or distance sensor
     PIN_A3_AS_DIGITAL = 17
     PIN_A4 = 4
-    PIN_A4_AS_DIGITAL = 18 # Also used for I2C
+    PIN_A4_AS_DIGITAL = 18  # Also used for I2C
     PIN_A5 = 5
-    PIN_A5_AS_DIGITAL = 19 # Also used for I2C
-    PIN_A6 = 6 # Commonly used for center line or distance sensor
+    PIN_A5_AS_DIGITAL = 19  # Also used for I2C
+    PIN_A6 = 6  # Commonly used for center line or distance sensor
     PIN_A6_AS_DIGITAL = 20
-    PIN_A7 = 7 # Commonly used for right line or distance sensor
+    PIN_A7 = 7  # Commonly used for right line or distance sensor
     PIN_A7_AS_DIGITAL = 21
-    PIN_3 = 3 # Common used for the left bumper
-    PIN_9 = 9 # Common location for the buzzer
-    PIN_10 = 10 # Commonly used for the right encoder
-    PIN_11 = 11 # Commonly used for the right bumper or Pixy MOSI
-    PIN_BUTTON = 12 # Commonly used for the button or Pixy MISO
+    PIN_3 = 3  # Common used for the left bumper
+    PIN_9 = 9  # Common location for the buzzer
+    PIN_10 = 10  # Commonly used for the right encoder
+    PIN_11 = 11  # Commonly used for the right bumper or Pixy MOSI
+    PIN_BUTTON = 12  # Commonly used for the button or Pixy MISO
     PIN_LED = 13
 
     PIN_LEFT_MOTOR_CONTROL_1 = 2
@@ -56,17 +56,17 @@ class RoseBotPhysicalConstants:
 
 class RoseBotConnection(PyMata3):
     """Creates the Pymata connection to the Arduino board with default parameters and returns the Pymata3 object."""
-    def __init__(self, ip_address=None, com_port=None, use_log_file=True, sleep_tune = 0):
+    def __init__(self, ip_address=None, com_port=None, use_log_file=True, sleep_tune=0):
         reboot_time = 2
         if ip_address != None:
             print("Connecting to ip address " + ip_address + "...")
-            reboot_time = 0 # Arduino does not reset if using a WiFly.
+            reboot_time = 0  # Arduino does not reset if using a WiFly.
         elif com_port != None:
             print("Connecting via com port " + com_port + "...")
         else:
             print("Connecting via com port using automatic com port detection...")
         super().__init__(arduino_wait=reboot_time, log_output=use_log_file, com_port=com_port, ip_address=ip_address, sleep_tune=sleep_tune)
-        self.keep_alive(period=2) # Send keep_alive message at 1.6 seconds, timeout at 2 seconds
+        self.keep_alive(period=2)  # Send keep_alive message at 1.6 seconds, timeout at 2 seconds
         print("Ready!")
 
 
@@ -78,8 +78,8 @@ class RoseBotMotors:
     DIRECTION_FORWARD = 1
     DIRECTION_REVERSE = -1
     # PWM duty cycle = PWM_DC_PER_CM_S_SPEED_MULTIPLIER * Desired cm/s speed + PWM_OFFSET
-    PWM_DC_PER_CM_S_SPEED_MULTIPLIER = 3.75 # when not usingencoder  this will give relatively accurate duty cycles
-    PWM_OFFSET = 30 # this offset is due to the physical offset required to get the wheels initially driving when not
+    PWM_DC_PER_CM_S_SPEED_MULTIPLIER = 3.75  # when not usingencoder  this will give relatively accurate duty cycles
+    PWM_OFFSET = 30  # this offset is due to the physical offset required to get the wheels initially driving when not
     shared_motors = None
 
     def __init__(self, board):
@@ -127,12 +127,12 @@ class RoseBotMotors:
             self.board.digital_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_CONTROL_2, 1)
             self.board.analog_write(RoseBotPhysicalConstants.PIN_RIGHT_MOTOR_PWM, 0)
 
-    def drive_pwm(self, left_pwm, right_pwm=None, use_encoder_feedback = False):
+    def drive_pwm(self, left_pwm, right_pwm=None, use_encoder_feedback=False):
         """Drive the left and right motors using pwm values.
            Positive values go forwards (capped at 255).  Negative values go in reverse (capped at -255).
         """
         if RoseBotEncoder.shared_encoder:
-            RoseBotEncoder.shared_encoder.update_shared_pids_on_encoder_callback = use_encoder_feedback # checks to see if encoder feedback is called
+            RoseBotEncoder.shared_encoder.update_shared_pids_on_encoder_callback = use_encoder_feedback  # checks to see if encoder feedback is called
         if right_pwm is None:  # If no right_pwm is entered, then the right motor speed mirrors the left motor
             right_pwm = left_pwm
         self.pwm_value_left = left_pwm
@@ -176,11 +176,11 @@ class RoseBotMotors:
             while RoseBotEncoder.shared_encoder.count_right < num_ticks  or \
                     RoseBotEncoder.shared_encoder.count_left < num_ticks:
                 self.board.sleep(RoseBotConstants.SAMPLING_INTERVAL_S)
-        self.brake()        
-        
+        self.brake()
+
     def drive_at_speed(self, speed_cm_per_s_left_motor, speed_cm_per_s_right_motor=None, use_encoder_feedback=False):
         """Function used to drive the RoseBot motors at a given speed, designated in cm/s"""
-        if speed_cm_per_s_right_motor==None:
+        if speed_cm_per_s_right_motor == None:
             speed_cm_per_s_right_motor = speed_cm_per_s_left_motor
         pwm_left_motor = speed_cm_per_s_left_motor * RoseBotMotors.PWM_DC_PER_CM_S_SPEED_MULTIPLIER + RoseBotMotors.PWM_OFFSET
         pwm_right_motor = speed_cm_per_s_right_motor * RoseBotMotors.PWM_DC_PER_CM_S_SPEED_MULTIPLIER + RoseBotMotors.PWM_OFFSET
@@ -216,7 +216,7 @@ class RoseBotMotors:
 
     def turn_angle(self, angle_degrees, motor_pwm=DEFAULT_MOTOR_SPEED):
         """Turns a certain number of degrees (negative is a left turn counterclockwise, positive is a right turn clockwise)"""
-        RoseBotEncoder.shared_encoder.update_shared_pids_on_encoder_callback= False
+        RoseBotEncoder.shared_encoder.update_shared_pids_on_encoder_callback = False
         RoseBotEncoder.shared_encoder.reset_encoder_counts()
         angle_radians = math.radians(angle_degrees)
         arc_length = RoseBotPhysicalConstants.WHEEL_TRACK_WIDTH_CM / 2.0 * angle_radians
@@ -230,13 +230,13 @@ class RoseBotMotors:
             self.drive_pwm_left(motor_pwm)
             self.drive_pwm_right(-motor_pwm)
         time_start = time.perf_counter()
-            
-    
+
+
         while abs(RoseBotEncoder.shared_encoder.count_left) < abs(angle_wanted_in_ticks) and abs(RoseBotEncoder.shared_encoder.count_right) < abs(angle_wanted_in_ticks):
             time_now = time.perf_counter()
             self.board.sleep(RoseBotConstants.SAMPLING_INTERVAL_S)
             spin_count = RoseBotEncoder.shared_encoder.count_left
-            if time_now-time_start>1:
+            if time_now - time_start > 1:
                 if abs(spin_count - RoseBotEncoder.shared_encoder.count_left) < 20:
                     break
         self.brake()
@@ -315,9 +315,9 @@ class RoseBotMotors:
 class RoseBotEncoder:
     """Track the encoder ticks.  This class should only be instantiated once and a shared reference used to
        communicate with the RoseMotor class."""
-    shared_encoder = None # Instance of the RoseBotEncoder that is shared with the RoseBotMotor class.
+    shared_encoder = None  # Instance of the RoseBotEncoder that is shared with the RoseBotMotor class.
     def __init__(self, board):
-        board.set_sampling_interval(100)  #TODO: Ask Dr. Fisher about this. Seems to work better the larger the sampling size - should it be set here??
+        board.set_sampling_interval(100)  # TODO: Ask Dr. Fisher about this. Seems to work better the larger the sampling size - should it be set here??
         RoseBotEncoder.shared_encoder = self  # Save a global reference to the one and only encoder instance so that the motors can set the direction.
         self.board = board
         self.count_left = 0
@@ -343,13 +343,13 @@ class RoseBotEncoder:
             self.count_right -= data[1]
         if self.update_shared_pids_on_encoder_callback:
             self._update_speeds_based_on_encoder_feedback()
-            adj_left = int(RoseBotMotors.shared_motors.pwm_value_left+RoseBotPid.shared_pid_left.update(self.speed_left))
-            adj_right = int(RoseBotMotors.shared_motors.pwm_value_right+RoseBotPid.shared_pid_right.update(self.speed_right))
+            adj_left = int(RoseBotMotors.shared_motors.pwm_value_left + RoseBotPid.shared_pid_left.update(self.speed_left))
+            adj_right = int(RoseBotMotors.shared_motors.pwm_value_right + RoseBotPid.shared_pid_right.update(self.speed_right))
             adj_left = min(abs(adj_left), 255)
             adj_right = min(abs(adj_right), 255)
 
-            RoseBotMotors.shared_motors.drive_pwm(adj_left,adj_right, True)
-            print("Left PWM: {}  Right PWM: {}  Left Speed: {:.3}   Right Speed: {:.3} ".format(adj_left,adj_right, self.speed_left,self.speed_right))
+            RoseBotMotors.shared_motors.drive_pwm(adj_left, adj_right, True)
+            print("Left PWM: {}  Right PWM: {}  Left Speed: {:.3}   Right Speed: {:.3} ".format(adj_left, adj_right, self.speed_left, self.speed_right))
 
 
     def reset_encoder_counts(self):
@@ -377,8 +377,8 @@ class RoseBotEncoder:
         current_time = time.perf_counter()
         delta_sec = current_time - self.time_of_last_update
         self.time_of_last_update = current_time
-        self.speed_left = (self.count_left - self.count_left_at_last_update) / delta_sec*(RoseBotPhysicalConstants.WHEEL_CIRC_CM/RoseBotPhysicalConstants.COUNTS_PER_REV)
-        self.speed_right = (self.count_right - self.count_right_at_last_update) / delta_sec*(RoseBotPhysicalConstants.WHEEL_CIRC_CM/RoseBotPhysicalConstants.COUNTS_PER_REV)
+        self.speed_left = (self.count_left - self.count_left_at_last_update) / delta_sec * (RoseBotPhysicalConstants.WHEEL_CIRC_CM / RoseBotPhysicalConstants.COUNTS_PER_REV)
+        self.speed_right = (self.count_right - self.count_right_at_last_update) / delta_sec * (RoseBotPhysicalConstants.WHEEL_CIRC_CM / RoseBotPhysicalConstants.COUNTS_PER_REV)
         self.count_left_at_last_update = self.count_left
         self.count_right_at_last_update = self.count_right
 
@@ -396,7 +396,7 @@ class RoseBotInput:
 class RoseBotAnalogInput(RoseBotInput):
     """Gets analog readings from the RoseBot sensors."""
 
-    def __init__(self, board, pin_number,callback=None):
+    def __init__(self, board, pin_number, callback=None):
         super().__init__(board, pin_number)
         board.set_pin_mode(pin_number, Constants.ANALOG, callback, Constants.CB_TYPE_DIRECT)
 
@@ -411,7 +411,7 @@ class RoseBotDigitalInput(RoseBotInput):
         super().__init__(board, pin_number)
         self.board.set_pin_mode(pin_number, Constants.INPUT, callback, Constants.CB_TYPE_DIRECT)
         self.board.digital_write(pin_number, 1)  # sets pin pull-up resistor. INPUT_PULLUP is not an option with Pymata
-        board.sleep(RoseBotConstants.SAMPLING_INTERVAL_S) # allows time for stabilization of signal before it is read
+        board.sleep(RoseBotConstants.SAMPLING_INTERVAL_S)  # allows time for stabilization of signal before it is read
 
     def read(self):
         return self.board.digital_read(self.pin_number)
@@ -430,9 +430,9 @@ class RoseBotServo:
 
 
 class RoseBotBuzzer:
-    #TODO: Add some notes (approx 12-20 notes)
+    # TODO: Add some notes (approx 12-20 notes)
 
-    def __init__(self, board, pin_number= RoseBotPhysicalConstants.PIN_9):
+    def __init__(self, board, pin_number=RoseBotPhysicalConstants.PIN_9):
         self.board = board
         self.pin_number = pin_number
 
@@ -469,7 +469,7 @@ class RoseBotPid:
     """
      This class provides a simple implementation of a pid controller for the RoseBot.
     """
-    
+
     def __init__(self, kp=2, ki=0, kd=0.0001, integrator_max=50, integrator_min=-50, set_point=0.0):
         """Create a PID instance with gains provided."""
         self.kp = kp
@@ -511,7 +511,7 @@ class RoseBotAccelerometer(MMA8452Q3):
     VAL_Z = 5
     VAL_ANGLE_XZ = 6
     VAL_ANGLE_YZ = 7
-    VAL_ANGLE_XY = 8    
+    VAL_ANGLE_XY = 8
 
     def __init__(self, board):
         DEVICE_ADDRESS = 0x1d  # Physical board address of the accelerometer
@@ -545,7 +545,7 @@ class RoseBotPixy:
     def __init__(self, board, pixy_callback=None):
         self.board = board
         self.pos_pan = 90
-        self.pos_tilt = 90 
+        self.pos_tilt = 90
         board.pixy_init(max_blocks=3, cb=pixy_callback, cb_type=Constants.CB_TYPE_ASYNCIO)
 
     def get_blocks(self):
@@ -575,15 +575,14 @@ class RoseBotPixy:
         blocks = self.get_blocks()
         print("Detected " + str(len(blocks)) + " Pixy blocks:")
         for block in blocks:
-            print("  sig: {}  x: {} y: {} width: {} height: {}".format( \
+            print("  sig: {}  x: {} y: {} width: {} height: {}".format(\
                     block.signature, block.x, block.y, block.width, block.height))
 
     def servo_pan_write(self, pos):
-        self.pos_pan = int(1000/180*pos)
-        
-        asyncio.ensure_future(self.board.core.pixy_set_servos(self.pos_pan,self.pos_tilt))
-        
+        self.pos_pan = int(1000 / 180 * pos)
+        asyncio.ensure_future(self.board.core.pixy_set_servos(self.pos_pan, self.pos_tilt))
+
     def servo_tilt_write(self, pos):
-        pos_tilt = int(1000/180*pos)
-        asyncio.ensure_future(self.board.core.pixy_set_servos(self.pos_pan,self.pos_tilt))
+        self.pos_tilt = int(1000 / 180 * pos)
+        asyncio.ensure_future(self.board.core.pixy_set_servos(self.pos_pan, self.pos_tilt))
 
